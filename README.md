@@ -137,4 +137,3 @@ The initial dataset contains **120 synthetic CRM records**.
 
 This project is a local, single-user prototype. Authentication, multi-user access controls, and public deployment are not implemented in this version.
 
-Keep `.env`, local databases, and the Chroma directory out of Git.
