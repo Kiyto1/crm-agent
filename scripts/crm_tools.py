@@ -1,133 +1,260 @@
+import sqlite3
+from contextlib import closing
+from datetime import date
 from pathlib import Path
-
-import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_FILE = PROJECT_ROOT / "data" / "saudi_crm_customers_synthetic.csv"
+DB_FILE = PROJECT_ROOT / "data" / "crm.db"
 
-
-def get_overdue_followups(as_of_date: str) -> list[dict]:
-    """Return open follow-up tasks due before the provided date."""
-
-    df = pd.read_csv(DATA_FILE, encoding="utf-8-sig")
-
-    # Convert dates before comparing them.
-    df["next_followup_date"] = pd.to_datetime(
-        df["next_followup_date"],
-        errors="raise",
-    )
-    reference_date = pd.Timestamp(as_of_date)
-
-    # Keep open tasks whose due date has passed.
-    overdue = df[
-        (df["task_status"] == "Open")
-        & (df["next_followup_date"] < reference_date)
-    ].sort_values("next_followup_date")
-
-    result = overdue[
-        [
-            "customer_id",
-            "full_name",
-            "assigned_owner",
-            "next_followup_date",
-            "next_action",
-        ]
-    ].copy()
-
-    # Format dates as strings for the returned records.
-    result["next_followup_date"] = (
-        result["next_followup_date"].dt.strftime("%Y-%m-%d")
-    )
-
-    return result.fillna("").to_dict(orient="records")
-
-def search_contacts(query: str) -> list[dict]:
-    """Find contacts whose name or company contains the search text."""
-
-    query = query.strip()
-    if not query:
-        return []
-
-    df = pd.read_csv(DATA_FILE, encoding="utf-8-sig")
-
-    # Match either the contact name or the company name.
-    matches = df[
-        df["full_name"].str.contains(
-            query, case=False, na=False, regex=False
-        )
-        | df["company_name"].str.contains(
-            query, case=False, na=False, regex=False
-        )
-    ]
-
-    result = matches[
-        [
-            "customer_id",
-            "full_name",
-            "company_name",
-            "job_title",
-            "assigned_owner",
-            "deal_stage",
-        ]
-    ]
 
 def search_contacts(query: str) -> list[dict]:
     """Find contacts by name or company."""
 
-    # Remove surrounding spaces and reject an empty search.
     query = query.strip()
     if not query:
         return []
 
-    df = pd.read_csv(DATA_FILE, encoding="utf-8-sig")
+    with closing(sqlite3.connect(DB_FILE)) as connection:
+        connection.row_factory = sqlite3.Row
 
-    # Search names and companies using literal, case-insensitive text.
-    # na=False treats missing values as nonmatches.
-    matches = df[
-        df["full_name"].str.contains(
-            query, case=False, na=False, regex=False
+        # Match literal search text in either field.
+        cursor = connection.execute(
+            """
+            SELECT customer_id, full_name, company_name,
+                   job_title, assigned_owner, deal_stage
+            FROM contacts
+            WHERE instr(lower(full_name), lower(?)) > 0
+               OR instr(lower(company_name), lower(?)) > 0
+            """,
+            (query, query),
         )
-        | df["company_name"].str.contains(
-            query, case=False, na=False, regex=False
-        )
-    ]
 
-    # Select the fields needed to identify each contact.
-    result = matches[
-        [
-            "customer_id",
-            "full_name",
-            "company_name",
-            "job_title",
-            "assigned_owner",
-            "deal_stage",
-        ]
-    ]
+        return [dict(row) for row in cursor.fetchall()]
 
-    # Replace missing values and return one dictionary per contact.
-    return result.fillna("").to_dict(orient="records")
 
 def get_contact_details(customer_id: str) -> dict:
     """Return a contact's complete record using their unique ID."""
 
-    df = pd.read_csv(DATA_FILE, encoding="utf-8-sig")
+    with closing(sqlite3.connect(DB_FILE)) as connection:
+        connection.row_factory = sqlite3.Row
 
-    # Find the row with this exact customer ID.
-    matches = df[df["customer_id"] == customer_id.strip()]
+        contact = connection.execute(
+            "SELECT * FROM contacts WHERE customer_id = ?",
+            (customer_id.strip(),),
+        ).fetchone()
 
-    if matches.empty:
-        return {"error": f"Contact not found: {customer_id}"}
+        if contact is None:
+            return {"error": f"Contact not found: {customer_id}"}
 
-    # Select the first matching row and return its fields.
-    return matches.fillna("").iloc[0].to_dict()
+        return dict(contact)
 
 
+def get_contact_tasks(customer_id: str) -> list[dict]:
+    """List all tasks in the tasks table for an exact customer ID."""
+
+    with closing(sqlite3.connect(DB_FILE)) as connection:
+        connection.row_factory = sqlite3.Row
+
+        # Include both open and completed tasks, earliest due first.
+        cursor = connection.execute(
+            """
+            SELECT task_id, customer_id, title,
+                   due_date, status, created_at
+            FROM tasks
+            WHERE customer_id = ?
+            ORDER BY due_date ASC, task_id ASC
+            """,
+            (customer_id.strip(),),
+        )
+
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_overdue_followups(as_of_date: str) -> dict:
+    """Return open contact follow-ups and tasks due before YYYY-MM-DD."""
+
+    reference_date = date.fromisoformat(as_of_date.strip()).isoformat()
+
+    with closing(sqlite3.connect(DB_FILE)) as connection:
+        connection.row_factory = sqlite3.Row
+
+        # Combine original contact follow-ups with separately created tasks.
+        # source identifies where each result comes from.
+        cursor = connection.execute(
+            """
+            SELECT
+                'contacts' AS source,
+                NULL AS task_id,
+                customer_id,
+                full_name,
+                assigned_owner,
+                next_followup_date,
+                next_action
+            FROM contacts
+            WHERE task_status = 'Open'
+              AND date(next_followup_date) < date(?)
+
+            UNION ALL
+
+            SELECT
+                'tasks' AS source,
+                t.task_id,
+                t.customer_id,
+                c.full_name,
+                c.assigned_owner,
+                t.due_date AS next_followup_date,
+                t.title AS next_action
+            FROM tasks AS t
+            JOIN contacts AS c
+              ON c.customer_id = t.customer_id
+            WHERE t.status = 'Open'
+              AND date(t.due_date) < date(?)
+
+            ORDER BY next_followup_date ASC
+            """,
+            (reference_date, reference_date),
+        )
+
+        # Calculate the exact total before sending results to Gemini.
+        items = [dict(row) for row in cursor.fetchall()]
+
+        return {
+            "as_of_date": reference_date,
+            "total": len(items),
+            "items": items,
+        }
+
+
+def create_task(customer_id: str, title: str, due_date: str) -> dict:
+    """Create a customer task with a title and YYYY-MM-DD due date."""
+
+    customer_id = customer_id.strip()
+    title = title.strip()
+
+    if not customer_id or not title:
+        return {"error": "Customer ID and task title are required."}
+
+    # Invalid dates raise ValueError before anything is saved.
+    due_date = date.fromisoformat(due_date.strip()).isoformat()
+
+    with closing(sqlite3.connect(DB_FILE)) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+
+        customer = connection.execute(
+            "SELECT customer_id FROM contacts WHERE customer_id = ?",
+            (customer_id,),
+        ).fetchone()
+
+        if customer is None:
+            return {"error": f"Contact not found: {customer_id}"}
+
+        # Commit the insert on success; roll back on failure.
+        with connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO tasks (customer_id, title, due_date)
+                VALUES (?, ?, ?)
+                """,
+                (customer_id, title, due_date),
+            )
+
+        return {
+            "task_id": cursor.lastrowid,
+            "customer_id": customer_id,
+            "title": title,
+            "due_date": due_date,
+            "status": "Open",
+        }
+
+
+def complete_task(task_id: int) -> dict:
+    """Mark a task in the tasks table as completed using its task ID."""
+
+    with closing(sqlite3.connect(DB_FILE)) as connection:
+        connection.row_factory = sqlite3.Row
+
+        # Check the task exists before updating it.
+        task = connection.execute(
+            "SELECT * FROM tasks WHERE task_id = ?",
+            (task_id,),
+        ).fetchone()
+
+        if task is None:
+            return {"error": f"Task not found: {task_id}"}
+
+        # Repeating completion leaves an already completed task unchanged.
+        with connection:
+            connection.execute(
+                "UPDATE tasks SET status = 'Completed' WHERE task_id = ?",
+                (task_id,),
+            )
+
+        result = dict(task)
+        result["status"] = "Completed"
+        return result
+
+def add_note(customer_id: str, content: str) -> dict:
+    """Save an interaction note for an existing customer."""
+
+    customer_id = customer_id.strip()
+    content = content.strip()
+
+    if not customer_id or not content:
+        return {"error": "Customer ID and note content are required."}
+
+    with closing(sqlite3.connect(DB_FILE)) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+
+        # Confirm the customer exists before saving.
+        customer = connection.execute(
+            "SELECT customer_id FROM contacts WHERE customer_id = ?",
+            (customer_id,),
+        ).fetchone()
+
+        if customer is None:
+            return {"error": f"Contact not found: {customer_id}"}
+
+        with connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO notes (customer_id, content)
+                VALUES (?, ?)
+                """,
+                (customer_id, content),
+            )
+
+        return {
+            "note_id": cursor.lastrowid,
+            "customer_id": customer_id,
+            "content": content,
+        }
+
+
+def get_contact_notes(customer_id: str) -> list[dict]:
+    """Retrieve saved interaction notes for an exact customer ID."""
+
+    with closing(sqlite3.connect(DB_FILE)) as connection:
+        connection.row_factory = sqlite3.Row
+
+        cursor = connection.execute(
+            """
+            SELECT note_id, customer_id, content, created_at
+            FROM notes
+            WHERE customer_id = ?
+            ORDER BY created_at DESC, note_id DESC
+            """,
+            (customer_id.strip(),),
+        )
+
+        return [dict(row) for row in cursor.fetchall()]
+    
+       
 if __name__ == "__main__":
-    # Use an ID from the search results you printed earlier.
-    customer_id = input("Enter customer ID: ").strip()
+    # Read-only test: running this file no longer creates duplicate tasks.
+    tasks = get_contact_tasks("CON-21066")
 
-    contact = get_contact_details(customer_id)
+    for task in tasks:
+        print(task)
 
-    for field, value in contact.items():
-        print(f"{field}: {value}")
+    print(f"\nTotal tasks: {len(tasks)}")
