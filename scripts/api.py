@@ -141,3 +141,110 @@ def approve(request: ApprovalRequest):
 
         # A resumed turn may finish or request another approval.
         return format_result(result, session_id)
+
+@app.get("/sessions")
+def list_sessions():
+    """List the most recent saved conversations."""
+
+    with graph_lock:
+        sessions = []
+        seen = set()
+
+        # Checkpoints are returned newest first.
+        for checkpoint in graph.checkpointer.list(None):
+            session_id = checkpoint.config["configurable"]["thread_id"]
+
+            if session_id in seen:
+                continue
+
+            seen.add(session_id)
+
+            # The API uses UUIDs; skip terminal-only conversation IDs.
+            try:
+                UUID(session_id)
+            except (ValueError, TypeError):
+                continue
+
+            messages = checkpoint.checkpoint.get(
+                "channel_values", {}
+            ).get("messages", [])
+
+            first_question = next(
+                (
+                    message.text
+                    for message in messages
+                    if message.type == "human" and message.text
+                ),
+                None,
+            )
+
+            if not first_question:
+                continue
+
+            sessions.append(
+                {
+                    "session_id": session_id,
+                    "title": first_question[:80],
+                    "updated_at": checkpoint.checkpoint["ts"],
+                }
+            )
+
+            if len(sessions) >= 50:
+                break
+
+        return {"sessions": sessions}
+
+
+@app.get("/sessions/{session_id}")
+def get_session(session_id: UUID):
+    """Restore a conversation and any pending approval."""
+
+    session_id = str(session_id)
+    config = graph_config(session_id)
+
+    with graph_lock:
+        snapshot = graph.get_state(config)
+
+        if not snapshot.values:
+            raise HTTPException(
+                status_code=404,
+                detail="Conversation not found.",
+            )
+
+        # Return visible messages, excluding internal tool requests/results.
+        messages = [
+            {
+                "id": message.id,
+                "role": "user" if message.type == "human" else "assistant",
+                "content": message.text,
+            }
+            for message in snapshot.values.get("messages", [])
+            if message.type in ("human", "ai")
+            and message.text
+            and not getattr(message, "tool_calls", None)
+        ]
+
+        result = {
+            "session_id": session_id,
+            "status": "completed",
+            "messages": messages,
+        }
+
+        pauses = [
+            pause
+            for task in snapshot.tasks
+            for pause in task.interrupts
+        ]
+
+        if pauses:
+            pause = pauses[0]
+
+            result.update(
+                {
+                    "status": "approval_required",
+                    "approval_id": pause.id,
+                    "changes": pause.value["changes"],
+                }
+            )
+
+        return result

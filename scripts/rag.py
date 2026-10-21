@@ -1,12 +1,12 @@
 import sqlite3
 import time
 from contextlib import closing
+from functools import lru_cache
 from pathlib import Path
+from threading import RLock
 
 from dotenv import load_dotenv
-from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -14,26 +14,31 @@ DB_FILE = PROJECT_ROOT / "data" / "crm.db"
 
 load_dotenv(PROJECT_ROOT / ".env")
 
-# Generate text embeddings using Google's API.
-embeddings = GoogleGenerativeAIEmbeddings(
-    model="gemini-embedding-001",
-)
-
-# Keep documents and their vectors in a local persistent database.
-vector_store = Chroma(
-    collection_name="crm_knowledge",
-    persist_directory=str(PROJECT_ROOT / "data" / "chroma"),
-    embedding_function=embeddings,
-)
+# Prevent overlapping synchronization and searches in this process.
+sync_lock = RLock()
 
 
-def index_crm_data():
-    """Index new contact summaries and saved notes for semantic search."""
+@lru_cache(maxsize=1)
+def get_vector_store():
+    """Create the embedding connection and local Chroma store when needed."""
 
-    documents = []
-    ids = []
+    from langchain_chroma import Chroma
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-    # Read the source records from SQLite.
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-001",
+    )
+
+    return Chroma(
+        collection_name="crm_knowledge",
+        persist_directory=str(PROJECT_ROOT / "data" / "chroma"),
+        embedding_function=embeddings,
+    )
+
+
+def load_crm_documents() -> list[Document]:
+    """Build searchable documents from the current SQLite records."""
+
     with closing(sqlite3.connect(DB_FILE)) as connection:
         connection.row_factory = sqlite3.Row
 
@@ -42,6 +47,7 @@ def index_crm_data():
             SELECT customer_id, full_name, company_name,
                    business_need, last_interaction_summary
             FROM contacts
+            ORDER BY customer_id
             """
         ).fetchall()
 
@@ -52,13 +58,14 @@ def index_crm_data():
             FROM notes AS n
             JOIN contacts AS c
               ON c.customer_id = n.customer_id
+            ORDER BY n.note_id
             """
         ).fetchall()
 
-    # Turn each contact summary into a searchable document.
-    for contact in contacts:
-        source_id = f"contact:{contact['customer_id']}"
+    documents = []
 
+    # Keep each contact summary as one document.
+    for contact in contacts:
         documents.append(
             Document(
                 page_content=(
@@ -70,17 +77,14 @@ def index_crm_data():
                 ),
                 metadata={
                     "customer_id": contact["customer_id"],
-                    "source_id": source_id,
+                    "source_id": f"contact:{contact['customer_id']}",
                     "source": "contact_summary",
                 },
             )
         )
-        ids.append(source_id)
 
-    # Keep each saved note separate so results can cite its source.
+    # Keep notes separate so answers can cite their exact IDs.
     for note in notes:
-        source_id = f"note:{note['note_id']}"
-
         documents.append(
             Document(
                 page_content=(
@@ -90,81 +94,137 @@ def index_crm_data():
                 ),
                 metadata={
                     "customer_id": note["customer_id"],
-                    "source_id": source_id,
+                    "source_id": f"note:{note['note_id']}",
                     "source": "saved_note",
                 },
             )
         )
-        ids.append(source_id)
 
-    if not documents:
-        print("No documents to index.")
-        return
+    return documents
 
-    # Reuse documents successfully indexed during previous runs.
-    existing_ids = set(vector_store.get(ids=ids)["ids"])
 
-    pending = [
-        (document, document_id)
-        for document, document_id in zip(documents, ids)
-        if document_id not in existing_ids
-    ]
+def retry_rate_limit(operation):
+    """Retry temporary quota errors, with at most three attempts."""
 
-    print(f"Already indexed: {len(existing_ids)}")
-    print(f"Remaining: {len(pending)}")
+    for attempt in range(3):
+        try:
+            return operation()
+        except Exception as error:
+            if "429" not in str(error) or attempt == 2:
+                raise
 
-    # Add new documents in batches and pause between batches.
-    for start in range(0, len(pending), 20):
-        batch = pending[start:start + 20]
+            print("Embedding rate limit reached. Waiting 60 seconds...")
+            time.sleep(60)
 
-        # Retry temporary rate-limit errors up to two times.
-        for attempt in range(3):
-            try:
-                vector_store.add_documents(
-                    documents=[document for document, _ in batch],
-                    ids=[document_id for _, document_id in batch],
+
+def index_crm_data() -> dict:
+    """Synchronize new, edited, and deleted source records with Chroma."""
+
+    with sync_lock:
+        store = get_vector_store()
+        documents = load_crm_documents()
+
+        # Reading stored text and metadata does not request embeddings.
+        stored = store.get(
+            include=["documents", "metadatas"],
+        )
+
+        existing = {
+            document_id: {
+                "text": text,
+                "metadata": metadata,
+            }
+            for document_id, text, metadata in zip(
+                stored["ids"],
+                stored["documents"],
+                stored["metadatas"],
+            )
+        }
+
+        pending = []
+        current_ids = set()
+
+        for document in documents:
+            document_id = document.metadata["source_id"]
+            current_ids.add(document_id)
+
+            previous = existing.get(document_id)
+
+            # Reuse existing embeddings when the source has not changed.
+            if (
+                previous is None
+                or previous["text"] != document.page_content
+                or previous["metadata"] != document.metadata
+            ):
+                pending.append(document)
+
+        # Update changed documents in paced batches.
+        for start in range(0, len(pending), 20):
+            batch = pending[start:start + 20]
+
+            retry_rate_limit(
+                lambda: store.add_documents(
+                    documents=batch,
+                    ids=[
+                        document.metadata["source_id"]
+                        for document in batch
+                    ],
                 )
-                break
-            except Exception as error:
-                # Other errors, or a third failed attempt, stop the script.
-                if "429" not in str(error) or attempt == 2:
-                    raise
+            )
 
-                print("Rate limit reached. Waiting 60 seconds...")
-                time.sleep(60)
+            completed = min(start + 20, len(pending))
+            print(f"RAG sync: indexed {completed}/{len(pending)} changes")
 
-        completed = min(start + 20, len(pending))
-        print(f"Indexed {completed}/{len(pending)} new documents")
+            if start + 20 < len(pending):
+                time.sleep(20)
 
-        if start + 20 < len(pending):
-            time.sleep(20)
+        # Remove documents whose SQLite source records were deleted.
+        obsolete_ids = sorted(set(existing) - current_ids)
 
-    print("Indexing complete.")
+        if obsolete_ids:
+            store.delete(ids=obsolete_ids)
+
+        return {
+            "total_documents": len(documents),
+            "updated_documents": len(pending),
+            "removed_documents": len(obsolete_ids),
+        }
 
 
 def search_crm_knowledge(query: str) -> list[dict]:
     """Find up to five relevant CRM summaries or notes by meaning.
 
-    Use for customer needs, requests, and conversation topics.
+    Synchronizes SQLite source records before searching.
     Results are candidates, not an exhaustive list or exact count.
     """
 
     query = query.strip()
+
     if not query:
         return []
 
-    # Convert the question into a vector and find similar documents.
-    documents = vector_store.similarity_search(query, k=5)
+    with sync_lock:
+        # Include new notes and refresh edits automatically.
+        summary = index_crm_data()
 
-    return [
-        {
-            "text": document.page_content,
-            "customer_id": document.metadata["customer_id"],
-            "source_id": document.metadata["source_id"],
-        }
-        for document in documents
-    ]
+        if summary["total_documents"] == 0:
+            return []
+
+        store = get_vector_store()
+
+        documents = retry_rate_limit(
+            lambda: store.similarity_search(query, k=5)
+        )
+
+        return [
+            {
+                "text": document.page_content,
+                "customer_id": document.metadata["customer_id"],
+                "source_id": document.metadata["source_id"],
+            }
+            for document in documents
+        ]
 
 
 if __name__ == "__main__":
-    index_crm_data()
+    print(index_crm_data())
