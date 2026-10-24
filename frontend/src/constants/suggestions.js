@@ -1,10 +1,12 @@
+// Starter suggestions shown in the empty chat state.
+// Each item becomes a clickable card; clicking it fills the input with `prompt`.
 export const SUGGESTIONS = [
   {
-    id: 'contacts',
-    icon: 'users',
-    title: 'Find contacts',
-    description: 'Search your CRM by name or company.',
-    prompt: 'Find contacts named Ahmed',
+    id: 'contacts', // unique id (used as the React key)
+    icon: 'users', // icon name the UI component maps to an SVG
+    title: 'Find contacts', // card heading
+    description: 'Search your CRM by name or company.', // short helper text
+    prompt: 'Find contacts named Ahmed', // text placed in the input when clicked
   },
   {
     id: 'notes',

@@ -3,12 +3,14 @@ import { formatSessionTime } from '../utils/formatSessionTime'
 import { getDisplayTitle } from '../utils/sessionMeta'
 import { groupSessionsByDate } from '../utils/groupSessions'
 
+// Headings for each date group (keys match groupSessionsByDate's output)
 const GROUP_LABELS = {
   today: 'Today',
   yesterday: 'Yesterday',
   earlier: 'Earlier',
 }
 
+// ---------- One chat row (title, time, "..." menu, rename mode) ----------
 function SessionRow({
   metaTick,
   session,
@@ -18,18 +20,22 @@ function SessionRow({
   onRename,
   onDelete,
 }) {
+  // metaTick is not used directly. Receiving a new value makes this
+  // component re-render, so getDisplayTitle() re-reads the latest titles.
   void metaTick
-  const menuId = useId()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [draftTitle, setDraftTitle] = useState('')
-  const menuRef = useRef(null)
-  const title = getDisplayTitle(session)
+  const menuId = useId() // unique id linking the button to its menu (accessibility)
+  const [menuOpen, setMenuOpen] = useState(false) // "..." menu visible
+  const [editing, setEditing] = useState(false) // rename mode on/off
+  const [draftTitle, setDraftTitle] = useState('') // text typed while renaming
+  const menuRef = useRef(null) // the menu wrapper element (for outside clicks)
+  const title = getDisplayTitle(session) // custom title or backend title
 
+  // While the menu is open: close it on outside click or Escape
   useEffect(() => {
     if (!menuOpen) return
 
     function handlePointer(event) {
+      // Click inside the menu: ignore. Outside: close.
       if (menuRef.current?.contains(event.target)) return
       setMenuOpen(false)
     }
@@ -40,23 +46,27 @@ function SessionRow({
 
     document.addEventListener('mousedown', handlePointer)
     document.addEventListener('keydown', handleKey)
+    // Cleanup: remove both listeners when the menu closes
     return () => {
       document.removeEventListener('mousedown', handlePointer)
       document.removeEventListener('keydown', handleKey)
     }
   }, [menuOpen])
 
+  // Enter rename mode, starting from the current title
   function startRename() {
     setDraftTitle(title)
     setEditing(true)
     setMenuOpen(false)
   }
 
+  // Save the new title (the parent stores it) and leave rename mode
   function commitRename() {
     onRename(session.session_id, draftTitle)
     setEditing(false)
   }
 
+  // Rename mode: show an input and a Save button instead of the row
   if (editing) {
     return (
       <div className="session-row session-row--editing">
@@ -65,8 +75,8 @@ function SessionRow({
           value={draftTitle}
           onChange={event => setDraftTitle(event.target.value)}
           onKeyDown={event => {
-            if (event.key === 'Enter') commitRename()
-            if (event.key === 'Escape') setEditing(false)
+            if (event.key === 'Enter') commitRename() // Enter saves
+            if (event.key === 'Escape') setEditing(false) // Escape cancels
           }}
           aria-label="Rename conversation"
           autoFocus
@@ -82,12 +92,14 @@ function SessionRow({
     )
   }
 
+  // Normal mode
   return (
     <div
       className={
         active ? 'session-row session-row--active' : 'session-row'
       }
     >
+      {/* Main button: opens this chat */}
       <button
         type="button"
         className="session-row__open"
@@ -102,6 +114,7 @@ function SessionRow({
         </span>
       </button>
 
+      {/* "..." options menu */}
       <div className="session-row__menu-wrap" ref={menuRef}>
         <button
           type="button"
@@ -147,6 +160,7 @@ function SessionRow({
   )
 }
 
+// ---------- A group of rows under one heading (Today / Yesterday / Earlier) ----------
 function SessionGroup({
   metaTick,
   label,
@@ -157,6 +171,7 @@ function SessionGroup({
   onRename,
   onDelete,
 }) {
+  // Don't render empty groups
   if (sessions.length === 0) return null
 
   return (
@@ -168,7 +183,7 @@ function SessionGroup({
             <SessionRow
               metaTick={metaTick}
               session={session}
-              active={session.session_id === sessionId}
+              active={session.session_id === sessionId} // highlight the open chat
               busy={busy}
               onOpen={onOpen}
               onRename={onRename}
@@ -181,6 +196,7 @@ function SessionGroup({
   )
 }
 
+// ---------- The sidebar itself ----------
 export default function Sidebar({
   metaTick,
   open,
@@ -193,15 +209,16 @@ export default function Sidebar({
   onRenameSession,
   onDeleteSession,
 }) {
-  void metaTick
-  const groups = groupSessionsByDate(sessions)
+  void metaTick // same trick: a new value triggers a re-render
+  const groups = groupSessionsByDate(sessions) // { today, yesterday, earlier }
 
   return (
     <aside
       id="conversation-sidebar"
-      className={open ? 'sidebar sidebar--open' : 'sidebar'}
+      className={open ? 'sidebar sidebar--open' : 'sidebar'} // --open shows it on mobile
       aria-label="Conversation history"
     >
+      {/* Brand and New chat button */}
       <div className="sidebar__top">
         <div className="sidebar__brand">
           <span className="sidebar__mark" aria-hidden="true">
@@ -220,10 +237,12 @@ export default function Sidebar({
         </button>
       </div>
 
+      {/* Chat list */}
       <nav className="sidebar__nav" aria-label="Saved conversations">
         {sessions.length === 0 ? (
           <p className="sidebar__empty">Your conversations will appear here.</p>
         ) : (
+          // Loop over Today / Yesterday / Earlier and render each group
           Object.entries(GROUP_LABELS).map(([key, label]) => (
             <SessionGroup
               key={key}
@@ -234,7 +253,7 @@ export default function Sidebar({
               busy={busy}
               onOpen={id => {
                 onOpenSession(id)
-                onClose()
+                onClose() // close the drawer on mobile after picking a chat
               }}
               onRename={onRenameSession}
               onDelete={onDeleteSession}
