@@ -4,6 +4,20 @@ A conversational CRM application built with **React, FastAPI, Gemini, LangGraph,
 
 The assistant can search customer records, manage tasks, save interaction notes, and retrieve relevant CRM information by meaning. Database changes require user approval.
 
+## Screenshots
+Customer Search
+<img width="2559" height="1391" alt="Screenshot 2026-10-25 183653" src="https://github.com/user-attachments/assets/161cf6fe-ea06-4d56-94a9-2c7922bebe76" />
+Find customers and identify overdue follow-ups through natural-language requests.
+
+Approval Workflow
+<img width="2558" height="1393" alt="Screenshot 2026-10-25 183731" src="https://github.com/user-attachments/assets/93028a37-82fb-41f8-bdc3-75f2b5be907a" />
+Review proposed changes and approve or reject them before they are saved.
+
+Customer Insights with Sources
+<img width="2559" height="1391" alt="Screenshot 2026-10-25 183824" src="https://github.com/user-attachments/assets/29b9d4ed-2568-48fd-9510-ddf774706a62" />
+Ask questions about customer notes and receive answers with source references.
+
+
 ## Features
 
 - Search contacts by name or company.
