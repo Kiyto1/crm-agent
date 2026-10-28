@@ -5,6 +5,27 @@ A conversational CRM application built with **React, FastAPI, Gemini, LangGraph,
 The assistant can search customer records, manage tasks, save interaction notes, and retrieve relevant CRM information by meaning. Database changes require user approval.
 
 ## Screenshots
+Customer Search
+<img width="827" height="1269" alt="image" src="https://github.com/user-attachments/assets/bd8bf004-1ce9-4be1-8b2b-346528b93f45" />
+<img width="2559" height="1391" alt="Screenshot 2026-10-25 183653" src="https://github.com/user-attachments/assets/161cf6fe-ea06-4d56-94a9-2c7922bebe76" />
+<img width="570" height="892" alt="image" src="https://github.com/user-attachments/assets/77953b1f-305b-4dc9-a3c0-5d86e29d5280" />
+
+Find customers and identify overdue follow-ups through natural-language requests.
+
+Approval Workflow
+<img width="2558" height="1393" alt="Screenshot 2026-10-25 183731" src="https://github.com/user-attachments/assets/93028a37-82fb-41f8-bdc3-75f2b5be907a" />
+<img width="744" height="1159" alt="image" src="https://github.com/user-attachments/assets/1a1b982d-26d2-410d-abd8-3b263dee096c" />
+
+Review proposed changes and approve or reject them before they are saved.
+
+Customer Insights with Sources
+<img width="2559" height="1391" alt="Screenshot 2026-10-25 183824" src="https://github.com/user-attachments/assets/29b9d4ed-2568-48fd-9510-ddf774706a62" />
+<img width="751" height="1195" alt="image" src="https://github.com/user-attachments/assets/e0dac1a8-bf5d-4b7f-8147-2f1bd9353e06" />
+
+Ask questions about customer notes and receive answers with source references.
+
+
+## Screenshots
 
 
 
