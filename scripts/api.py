@@ -1,46 +1,73 @@
 from threading import Lock
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictBool
 
 from graph_agent import graph
+from session_store import (
+    save_session_owner,
+    require_session_owner,
+    get_visitor_sessions,
+)
 
 
 app = FastAPI(title="CRM Agent API")
 
-# Prevent overlapping requests from changing graph state.
+# Prevent overlapping requests from changing the shared graph state.
 graph_lock = Lock()
 
 
 class ChatRequest(BaseModel):
-    """Expected JSON fields for a chat request."""
+    """JSON fields accepted when sending a message."""
 
-    message: str = Field(min_length=1)
+    # Limit message size for the public demo.
+    message: str = Field(min_length=1, max_length=2000)
+
+    # New conversations do not have a session ID yet.
     session_id: UUID | None = None
 
 
 class ApprovalRequest(BaseModel):
-    """Identify a pending proposal and provide the user's decision."""
+    """Identify a pending change and provide the user's decision."""
 
     session_id: UUID
-    approval_id: str
-    approved: bool
+    approval_id: str = Field(min_length=1, max_length=200)
+
+    # Accept only actual JSON true or false.
+    approved: StrictBool
+
+
+def get_visitor_id(request: Request) -> str:
+    """Read the visitor identity provided by hosted.py."""
+
+    visitor_id = getattr(request.state, "visitor_id", None)
+
+    # Do not allow conversation access without a browser identity.
+    if not visitor_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Open the CRM through the hosted application.",
+        )
+
+    return visitor_id
 
 
 def graph_config(session_id: str) -> dict:
-    """Connect an API session to its LangGraph conversation."""
+    """Connect this conversation to its LangGraph checkpoint."""
 
     return {
-        "configurable": {"thread_id": session_id},
+        "configurable": {
+            "thread_id": session_id,
+        },
         "recursion_limit": 30,
     }
 
 
 def pending_approvals(config: dict) -> list:
-    """Read pending approval pauses from the graph checkpoint."""
+    """Find approval pauses saved in the conversation."""
 
     snapshot = graph.get_state(config)
 
@@ -52,7 +79,7 @@ def pending_approvals(config: dict) -> list:
 
 
 def format_result(result: dict, session_id: str) -> dict:
-    """Return either a final answer or an approval proposal."""
+    """Prepare an answer or approval proposal for the frontend."""
 
     pauses = result.get("__interrupt__", ())
 
@@ -75,15 +102,20 @@ def format_result(result: dict, session_id: str) -> dict:
 
 @app.get("/health")
 def health():
-    """Check that the API server is running."""
+    """Check that the API is running."""
 
     return {"status": "ok"}
 
 
 @app.post("/chat")
-def chat(request: ChatRequest):
+def chat(
+    request: ChatRequest,
+    visitor_id: str = Depends(get_visitor_id),
+):
     """Send a message to a new or existing conversation."""
 
+    # Depends runs get_visitor_id before this handler.
+    # Its returned value becomes visitor_id.
     message = request.message.strip()
 
     if not message:
@@ -92,21 +124,41 @@ def chat(request: ChatRequest):
             detail="Message cannot be blank.",
         )
 
-    # Generate a conversation ID if none was supplied.
-    session_id = str(request.session_id or uuid4())
-    config = graph_config(session_id)
-
     with graph_lock:
-        # Resolve pending changes before accepting another message.
+        if request.session_id:
+            # Continuing an existing chat requires ownership.
+            session_id = str(request.session_id)
+
+            require_session_owner(
+                session_id,
+                visitor_id,
+            )
+
+        else:
+            # The server creates new IDs rather than trusting a supplied ID.
+            session_id = str(uuid4())
+
+            # Link this new conversation to the current visitor.
+            save_session_owner(
+                session_id,
+                visitor_id,
+            )
+
+        config = graph_config(session_id)
+
+        # Resolve pending approvals before accepting another message.
         if pending_approvals(config):
             raise HTTPException(
                 status_code=409,
                 detail="Approve or reject the pending change first.",
             )
 
+        # Run the graph with this message and reset the turn's call counter.
         result = graph.invoke(
             {
-                "messages": [HumanMessage(content=message)],
+                "messages": [
+                    HumanMessage(content=message),
+                ],
                 "approved": False,
                 "model_calls": 0,
             },
@@ -117,49 +169,73 @@ def chat(request: ChatRequest):
 
 
 @app.post("/approve")
-def approve(request: ApprovalRequest):
-    """Approve or reject pending database changes."""
+def approve(
+    request: ApprovalRequest,
+    visitor_id: str = Depends(get_visitor_id),
+):
+    """Approve or reject changes in a conversation owned by this visitor."""
 
     session_id = str(request.session_id)
     config = graph_config(session_id)
 
     with graph_lock:
+        # A visitor cannot approve changes in someone else's conversation.
+        require_session_owner(
+            session_id,
+            visitor_id,
+        )
+
         pauses = pending_approvals(config)
 
-        # Reject expired, incorrect, or repeated approval requests.
+        # Reject incorrect, expired, or already-used approval IDs.
         if not pauses or pauses[0].id != request.approval_id:
             raise HTTPException(
                 status_code=409,
                 detail="This approval is no longer pending.",
             )
 
-        # Resume the graph with the user's decision.
+        # Continue the paused workflow with the user's decision.
         result = graph.invoke(
             Command(resume=request.approved),
             config=config,
         )
 
-        # A resumed turn may finish or request another approval.
+        # The graph may finish or request another approval.
         return format_result(result, session_id)
 
+
 @app.get("/sessions")
-def list_sessions():
-    """List the most recent saved conversations."""
+def list_sessions(
+    visitor_id: str = Depends(get_visitor_id),
+):
+    """List only this visitor's most recent conversations."""
 
     with graph_lock:
+        # Read the conversation IDs owned by this visitor.
+        allowed_sessions = get_visitor_sessions(visitor_id)
+
+        if not allowed_sessions:
+            return {"sessions": []}
+
         sessions = []
         seen = set()
 
         # Checkpoints are returned newest first.
+        # A conversation can have many checkpoints.
         for checkpoint in graph.checkpointer.list(None):
             session_id = checkpoint.config["configurable"]["thread_id"]
 
+            # Exclude conversations owned by other visitors.
+            if session_id not in allowed_sessions:
+                continue
+
+            # Include each conversation only once.
             if session_id in seen:
                 continue
 
             seen.add(session_id)
 
-            # The API uses UUIDs; skip terminal-only conversation IDs.
+            # Skip terminal-only IDs that are not UUIDs.
             try:
                 UUID(session_id)
             except (ValueError, TypeError):
@@ -169,6 +245,7 @@ def list_sessions():
                 "channel_values", {}
             ).get("messages", [])
 
+            # Use the first user message as the conversation title.
             first_question = next(
                 (
                     message.text
@@ -178,6 +255,7 @@ def list_sessions():
                 None,
             )
 
+            # A checkpoint without a user message has no chat to display.
             if not first_question:
                 continue
 
@@ -189,6 +267,7 @@ def list_sessions():
                 }
             )
 
+            # Keep the sidebar response reasonably small.
             if len(sessions) >= 50:
                 break
 
@@ -196,13 +275,22 @@ def list_sessions():
 
 
 @app.get("/sessions/{session_id}")
-def get_session(session_id: UUID):
-    """Restore a conversation and any pending approval."""
+def get_session(
+    session_id: UUID,
+    visitor_id: str = Depends(get_visitor_id),
+):
+    """Restore an owned conversation and any pending approval."""
 
     session_id = str(session_id)
     config = graph_config(session_id)
 
     with graph_lock:
+        # Check ownership before reading conversation contents.
+        require_session_owner(
+            session_id,
+            visitor_id,
+        )
+
         snapshot = graph.get_state(config)
 
         if not snapshot.values:
@@ -211,11 +299,16 @@ def get_session(session_id: UUID):
                 detail="Conversation not found.",
             )
 
-        # Return visible messages, excluding internal tool requests/results.
+        # Return visible user and assistant messages.
+        # Internal tool calls and tool results stay on the backend.
         messages = [
             {
                 "id": message.id,
-                "role": "user" if message.type == "human" else "assistant",
+                "role": (
+                    "user"
+                    if message.type == "human"
+                    else "assistant"
+                ),
                 "content": message.text,
             }
             for message in snapshot.values.get("messages", [])
@@ -230,6 +323,7 @@ def get_session(session_id: UUID):
             "messages": messages,
         }
 
+        # Restore the approval panel if this conversation was paused.
         pauses = [
             pause
             for task in snapshot.tasks

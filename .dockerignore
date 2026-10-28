@@ -1,0 +1,13 @@
+.git
+.venv
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+frontend/dist
+.env
+.env.*
+*.zip
+*.patch
+
+data/*
+!data/saudi_crm_customers_synthetic.csv
