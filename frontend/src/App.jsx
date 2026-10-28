@@ -128,35 +128,49 @@ export default function App() {
 
     async function restoreWorkspace() {
       try {
+        // Load the saved conversations for this visitor.
         const savedSessions = await apiRequest('/sessions')
 
         if (cancelled) return
 
         setSessions(savedSessions.sessions)
 
+        // Check whether the browser remembers an open conversation.
         const savedId = localStorage.getItem('crm.session')
 
         if (savedId) {
-          const history = await apiRequest(`/sessions/${savedId}`)
+          try {
+            const history = await apiRequest(`/sessions/${savedId}`)
 
-          if (!cancelled) {
+            if (cancelled) return
+
             setSessionId(history.session_id)
             setMessages(history.messages)
             setProposal(
               history.status === 'approval_required' ? history : null
             )
+          } catch (requestError) {
+            if (cancelled) return
+
+            // Handle an expired conversation by starting fresh.
+            if (requestError.status === 404) {
+              localStorage.removeItem('crm.session')
+              setSessionId(null)
+              setMessages([])
+              setProposal(null)
+              setError('')
+            } else {
+              throw requestError
+            }
           }
         }
       } catch (requestError) {
+        // Display unexpected errors, including failure to load the list.
         if (!cancelled) {
           setError(requestError.message)
-
-          // Saved chat no longer exists on the server: forget it
-          if (requestError.status === 404) {
-            setSessionId(null)
-          }
         }
       } finally {
+        // Release the request lock and finish loading.
         if (!cancelled) {
           inFlight.current = false
           setBusy(false)
@@ -166,6 +180,7 @@ export default function App() {
 
     restoreWorkspace()
 
+    // Ignore results from this effect after cleanup.
     return () => {
       cancelled = true
     }
