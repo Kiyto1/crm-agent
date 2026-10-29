@@ -1,71 +1,109 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from './api'
+
 import ApprovalPanel from './components/ApprovalPanel'
 import ChatHeader from './components/ChatHeader'
 import ChatInput from './components/ChatInput'
+import DemoGuide from './components/DemoGuide'
 import EmptyState from './components/EmptyState'
 import MessageList from './components/MessageList'
 import Sidebar from './components/Sidebar'
+
 import { useTheme } from './hooks/useTheme'
+
 import {
   hideSession,
   renameSession,
   visibleSessions,
 } from './utils/sessionMeta'
+
 import './App.css'
 
+
+const SESSION_KEY = 'crm.session'
+
+// localStorage can throw (private mode, blocked storage), so wrap it.
+function readStoredSession() {
+  try {
+    return localStorage.getItem(SESSION_KEY)
+  } catch {
+    return null
+  }
+}
+
+function writeStoredSession(id) {
+  try {
+    if (id) {
+      localStorage.setItem(SESSION_KEY, id)
+    } else {
+      localStorage.removeItem(SESSION_KEY)
+    }
+  } catch {
+    // Storage unavailable; the chat still works without persistence.
+  }
+}
+
+
 export default function App() {
-  // ---------- State ----------
-  const [messages, setMessages] = useState([]) // messages shown in the chat
-  const [sessions, setSessions] = useState([]) // chat list from the backend
-  const [input, setInput] = useState('') // text in the input box
+  // Messages and conversations displayed by the interface.
+  const [messages, setMessages] = useState([])
+  const [sessions, setSessions] = useState([])
+  const [input, setInput] = useState('')
 
-  // Current chat id; starts from the id saved in localStorage (if any)
-  const [sessionId, setSessionId] = useState(
-    () => localStorage.getItem('crm.session')
-  )
+  // Restore the last selected conversation ID from this browser.
+  const [sessionId, setSessionId] = useState(readStoredSession)
 
-  const [proposal, setProposal] = useState(null) // pending approval, or null
-  const [busy, setBusy] = useState(true) // true while a request runs (starts true for the initial restore)
-  const [error, setError] = useState('') // error banner text
-  const [sidebarOpen, setSidebarOpen] = useState(false) // mobile sidebar drawer
-  const [metaVersion, setMetaVersion] = useState(0) // bumped to re-render after rename/hide
+  // Pending database changes and interface status.
+  const [proposal, setProposal] = useState(null)
+  const [busy, setBusy] = useState(true)
+  const [error, setError] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // ---------- Refs (do not trigger re-renders) ----------
-  const inFlight = useRef(false) // instant lock against double requests
-  const chatScrollRef = useRef(null) // the scrollable chat element
-  const prevCount = useRef(0) // previous message count (for scroll behavior)
-  const { theme, cycleTheme, label: themeLabel } = useTheme()
+  // Trigger a render after locally renaming or hiding conversations.
+  const [metaVersion, setMetaVersion] = useState(0)
 
-  // Sessions without the ones the user hid locally
+  // Refs remember values without triggering renders.
+  const inFlight = useRef(false)
+  const chatScrollRef = useRef(null)
+  const prevCount = useRef(0)
+
+  const {
+    theme,
+    cycleTheme,
+    label: themeLabel,
+  } = useTheme()
+
+  // Exclude conversations hidden locally by this browser.
   const displaySessions = visibleSessions(sessions)
 
-  // ---------- Helpers ----------
 
-  // Append one message to the end of the chat
   function addMessage(role, content) {
-    setMessages(previous => [
-      ...previous,
-      {
-        id: crypto.randomUUID(),
-        role,
-        content,
-      },
-    ])
+    const id = crypto.randomUUID()
+
+    setMessages(previous => [...previous, { id, role, content }])
+
+    return id
   }
 
-  // Replace the whole screen with a saved conversation from the backend
+
+  function removeMessage(id) {
+    setMessages(previous => previous.filter(m => m.id !== id))
+  }
+
+
   function applyHistory(data) {
+    // Replace the current display with a saved conversation.
     setSessionId(data.session_id)
     setMessages(data.messages)
+
     setProposal(
       data.status === 'approval_required' ? data : null
     )
   }
 
-  // Handle a /chat or /approve response:
-  // either show the approval panel or add the assistant's answer
+
   function handleResult(data) {
+    // Handle either a normal answer or a proposed database change.
     setSessionId(data.session_id)
 
     if (data.status === 'approval_required') {
@@ -76,101 +114,120 @@ export default function App() {
     }
   }
 
-  // Reload the chat list for the sidebar
+
   async function refreshSessions() {
-    const data = await apiRequest('/sessions')
-    setSessions(data.sessions)
+    // A sidebar refresh failure should never hide a successful result.
+    try {
+      const data = await apiRequest('/sessions')
+      setSessions(data.sessions)
+    } catch {
+      // Ignore.
+    }
   }
 
-  // ---------- Effects ----------
 
-  // Keep localStorage in sync with the current session id
-  useEffect(() => {
-    if (sessionId) {
-      localStorage.setItem('crm.session', sessionId)
-    } else {
-      localStorage.removeItem('crm.session')
+  // Runs one request at a time and handles busy/error state in one place.
+  async function runRequest(task) {
+    if (inFlight.current) return
+
+    inFlight.current = true
+    setBusy(true)
+    setError('')
+
+    try {
+      await task()
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      inFlight.current = false
+      setBusy(false)
     }
+  }
+
+
+  // Keep the selected conversation ID in browser storage.
+  useEffect(() => {
+    writeStoredSession(sessionId)
   }, [sessionId])
 
-  // Scroll to the bottom when content changes
+
+  // Scroll to the latest conversation content.
   useEffect(() => {
     const el = chatScrollRef.current
+
     if (!el) return
 
     const added = messages.length - prevCount.current
     prevCount.current = messages.length
 
-    // Smooth for a single new message, instant otherwise
     el.scrollTo({
       top: el.scrollHeight,
       behavior: added === 1 ? 'smooth' : 'auto',
     })
   }, [messages, proposal, busy])
 
-  // Close the sidebar with the Escape key while it is open
+
+  // Allow Escape to close the mobile sidebar.
   useEffect(() => {
     if (!sidebarOpen) return
 
     function onKeyDown(event) {
-      if (event.key === 'Escape') setSidebarOpen(false)
+      if (event.key === 'Escape') {
+        setSidebarOpen(false)
+      }
     }
 
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown) // cleanup
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+    }
   }, [sidebarOpen])
 
-  // On first load: restore the sidebar list and the last opened chat
+
+  // Restore saved conversations and the previously selected chat.
   useEffect(() => {
-    let cancelled = false // set to true if the component unmounts mid-request
+    let cancelled = false
 
     inFlight.current = true
 
     async function restoreWorkspace() {
       try {
-        // Load the saved conversations for this visitor.
-        const savedSessions = await apiRequest('/sessions')
+        const saved = await apiRequest('/sessions')
 
         if (cancelled) return
 
-        setSessions(savedSessions.sessions)
+        setSessions(saved.sessions)
 
-        // Check whether the browser remembers an open conversation.
-        const savedId = localStorage.getItem('crm.session')
+        const savedId = readStoredSession()
 
-        if (savedId) {
-          try {
-            const history = await apiRequest(`/sessions/${savedId}`)
+        if (!savedId) return
 
-            if (cancelled) return
+        try {
+          const history = await apiRequest(`/sessions/${savedId}`)
 
-            setSessionId(history.session_id)
-            setMessages(history.messages)
-            setProposal(
-              history.status === 'approval_required' ? history : null
-            )
-          } catch (requestError) {
-            if (cancelled) return
+          if (cancelled) return
 
-            // Handle an expired conversation by starting fresh.
-            if (requestError.status === 404) {
-              localStorage.removeItem('crm.session')
-              setSessionId(null)
-              setMessages([])
-              setProposal(null)
-              setError('')
-            } else {
-              throw requestError
-            }
+          applyHistory(history)
+        } catch (requestError) {
+          if (cancelled) return
+
+          if (requestError.status === 404) {
+            // Free hosting may reset the saved server data.
+            // Forget the expired conversation and start fresh.
+            setSessionId(null)
+            setMessages([])
+            setProposal(null)
+          } else {
+            throw requestError
           }
         }
       } catch (requestError) {
-        // Display unexpected errors, including failure to load the list.
+        // Display unexpected errors, such as a failed connection.
         if (!cancelled) {
           setError(requestError.message)
         }
       } finally {
-        // Release the request lock and finish loading.
         if (!cancelled) {
           inFlight.current = false
           setBusy(false)
@@ -180,119 +237,94 @@ export default function App() {
 
     restoreWorkspace()
 
-    // Ignore results from this effect after cleanup.
+    // Ignore results after this effect has been cleaned up.
     return () => {
       cancelled = true
     }
   }, [])
 
-  // ---------- Actions ----------
 
-  // Open a saved chat from the sidebar
-  async function openSession(id) {
-    if (inFlight.current) return
-
-    inFlight.current = true
-    setBusy(true)
-    setError('')
-
-    try {
+  function openSession(id) {
+    return runRequest(async () => {
       const data = await apiRequest(`/sessions/${id}`)
 
       applyHistory(data)
       setInput('')
-    } catch (requestError) {
-      setError(requestError.message)
-    } finally {
-      inFlight.current = false
-      setBusy(false)
-    }
+      setSidebarOpen(false)
+    })
   }
 
-  // Send the typed message to the backend
-  async function sendMessage() {
+
+  function sendMessage() {
     const message = input.trim()
 
-    // Ignore empty input, running requests, and pending approvals
-    if (!message || inFlight.current || proposal) return
+    // Prevent empty messages and sending while changes await approval.
+    if (!message || proposal) return
 
-    inFlight.current = true
-    setBusy(true)
-    setError('')
-    setInput('')
-    addMessage('user', message) // show it immediately (optimistic update)
+    return runRequest(async () => {
+      setInput('')
 
-    try {
-      const body = { message }
-
-      // New chats have no id yet; the backend creates one
-      if (sessionId) {
-        body.session_id = sessionId
-      }
-
-      const data = await apiRequest('/chat', body)
-
-      handleResult(data)
-
-      // Refresh the sidebar; a failure here should not hide the reply
-      try {
-        await refreshSessions()
-      } catch {
-        // Refreshing the page or selecting a chat can retry later.
-      }
-    } catch (requestError) {
-      setError(requestError.message)
-    } finally {
-      inFlight.current = false
-      setBusy(false)
-    }
-  }
-
-  // Approve or reject the pending database change
-  async function decideApproval(approved) {
-    if (!proposal || inFlight.current) return
-
-    inFlight.current = true
-    setBusy(true)
-    setError('')
-
-    try {
-      const data = await apiRequest('/approve', {
-        session_id: proposal.session_id,
-        approval_id: proposal.approval_id,
-        approved,
-      })
-
-      handleResult(data)
+      // Display the user's message immediately.
+      const pendingId = addMessage('user', message)
 
       try {
-        await refreshSessions()
-      } catch {
-        // Keep the successful approval response visible.
-      }
-    } catch (requestError) {
-      setError(requestError.message)
+        const body = { message }
 
-      // 409 = approval is stale/already handled: re-sync with the server
-      if (requestError.status === 409 && sessionId) {
-        try {
-          applyHistory(
-            await apiRequest(`/sessions/${sessionId}`)
-          )
-        } catch {
-          // Preserve the original error.
+        // Omit the ID for new chats so the backend creates one.
+        if (sessionId) {
+          body.session_id = sessionId
         }
+
+        const data = await apiRequest('/chat', body)
+
+        handleResult(data)
+      } catch (requestError) {
+        // Undo the optimistic message and give the text back for retry.
+        removeMessage(pendingId)
+        setInput(message)
+        throw requestError
       }
-    } finally {
-      inFlight.current = false
-      setBusy(false)
-    }
+
+      await refreshSessions()
+    })
   }
 
-  // Start a fresh chat (the backend creates the session on the first message)
+
+  function decideApproval(approved) {
+    if (!proposal) return
+
+    return runRequest(async () => {
+      try {
+        const data = await apiRequest('/approve', {
+          session_id: proposal.session_id,
+          approval_id: proposal.approval_id,
+          approved,
+        })
+
+        handleResult(data)
+      } catch (requestError) {
+        // Reload the conversation if the approval was already handled
+        // or no longer matches the server's current state.
+        if (requestError.status === 409 && sessionId) {
+          try {
+            applyHistory(await apiRequest(`/sessions/${sessionId}`))
+          } catch {
+            // Preserve the original error.
+          }
+        }
+
+        throw requestError
+      }
+
+      await refreshSessions()
+    })
+  }
+
+
   function newChat() {
     if (inFlight.current) return
 
+    // Clear the interface without deleting previous server history.
     setMessages([])
     setSessionId(null)
     setProposal(null)
@@ -301,38 +333,39 @@ export default function App() {
     setSidebarOpen(false)
   }
 
-  // Rename a chat locally, then re-render to show the new title
+
   function handleRenameSession(id, title) {
+    // Custom titles are stored locally in this browser.
     renameSession(id, title)
     setMetaVersion(version => version + 1)
   }
 
-  // "Delete" a chat locally (it is only hidden, not removed from the server)
+
   function handleDeleteSession(id) {
+    // Hide the conversation locally rather than deleting server data.
     hideSession(id)
     setMetaVersion(version => version + 1)
 
-    // If the open chat was hidden, switch to a new one
     if (id === sessionId) {
       newChat()
     }
   }
 
-  // ---------- Derived flags ----------
-  const showEmpty = messages.length === 0 && !busy // show starter prompts
-  const showTyping = busy && messages.length > 0 // show typing indicator
-  const inputBlocked = busy || Boolean(proposal) // block input while busy or awaiting approval
-  const sending = showTyping
 
-  // ---------- UI ----------
+  // Calculate interface conditions from the current state.
+  const showEmpty = messages.length === 0 && !busy
+  const showTyping = busy && messages.length > 0
+  const inputBlocked = busy || Boolean(proposal)
+
+
   return (
     <div className="workspace-shell">
-      {/* Accessibility: lets keyboard users skip the sidebar */}
+      {/* Keyboard users can skip directly to the conversation. */}
       <a className="skip-link" href="#main-content">
         Skip to conversation
       </a>
 
-      {/* Dark overlay behind the mobile sidebar; click to close */}
+      {/* Close the mobile sidebar when its backdrop is clicked. */}
       {sidebarOpen && (
         <button
           type="button"
@@ -342,7 +375,6 @@ export default function App() {
         />
       )}
 
-      {/* Chat list */}
       <Sidebar
         metaTick={metaVersion}
         open={sidebarOpen}
@@ -357,7 +389,7 @@ export default function App() {
       />
 
       <main className="app" id="main-content">
-        {/* Top bar shown on mobile */}
+        {/* Compact navigation controls for smaller screens. */}
         <div className="mobile-bar">
           <button
             type="button"
@@ -366,12 +398,25 @@ export default function App() {
             aria-controls="conversation-sidebar"
             onClick={() => setSidebarOpen(open => !open)}
           >
-            <span className="sr-only">Toggle conversation list</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <span className="sr-only">
+              Toggle conversation list
+            </span>
+
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <p className="mobile-bar__title">CRM Assistant</p>
+
+          <p className="mobile-bar__title">
+            CRM Assistant
+          </p>
+
           <button
             type="button"
             className="icon-button"
@@ -379,7 +424,13 @@ export default function App() {
             disabled={busy}
             aria-label="Start new chat"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
               <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
@@ -392,16 +443,21 @@ export default function App() {
             themeLabel={themeLabel}
           />
 
-          {/* Scrollable chat area */}
           <section
             ref={chatScrollRef}
             className="chat-scroll"
             aria-label="Conversation"
             aria-busy={busy}
           >
-            {/* Starter prompts: clicking one fills the input */}
+            {/* Explain the demo, its CSV data, and suggested tests. */}
+            <DemoGuide
+              onSelectPrompt={setInput}
+              disabled={inputBlocked}
+            />
+
+            {/* Starter cards fill the input without submitting it. */}
             {showEmpty && (
-              <EmptyState onSelectPrompt={prompt => setInput(prompt)} />
+              <EmptyState onSelectPrompt={setInput} />
             )}
 
             {messages.length > 0 && (
@@ -411,12 +467,12 @@ export default function App() {
               />
             )}
 
-            {/* Approve/reject UI for proposed database changes */}
+            {/* Show proposed changes before they are approved. */}
             <ApprovalPanel
               proposal={proposal}
               busy={busy}
-              onApprove={decideApproval}
-              onReject={decideApproval}
+              onApprove={() => decideApproval(true)}
+              onReject={() => decideApproval(false)}
             />
 
             {error && (
@@ -431,7 +487,7 @@ export default function App() {
             onChange={setInput}
             onSend={sendMessage}
             disabled={inputBlocked}
-            loading={sending}
+            loading={showTyping}
             placeholder={
               proposal
                 ? 'Review the proposed changes above…'
