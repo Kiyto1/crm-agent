@@ -1,7 +1,7 @@
 """Web endpoints for the dashboard pages.
 
-These functions are thin: they check the input, call crm_tools (the same
-code the assistant uses) and turn {"error": ...} results into HTTP errors.
+These functions are thin: they check the input, call crm_tools / deals (the
+same code the assistant uses) and turn {"error": ...} results into HTTP errors.
 """
 
 from datetime import date
@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 import crm_tools
+import deals
 
 
 router = APIRouter()
@@ -47,6 +48,16 @@ class Reschedule(BaseModel):
     due_date: date
 
 
+class StageChange(BaseModel):
+    # deals.update_deal_stage checks the value against the real stage list.
+    stage: str = Field(min_length=1, max_length=40)
+
+
+class NewActivity(BaseModel):
+    channel: str = Field(min_length=1, max_length=20)
+    summary: str = Field(min_length=1, max_length=500)
+
+
 # ---------- Reads ----------
 
 
@@ -77,7 +88,7 @@ def customer_filters():
 
 @router.get("/customers/{customer_id}")
 def customer_detail(customer_id: str):
-    """One customer with their notes and tasks, for the detail drawer."""
+    """One customer with notes, tasks and activity, for the detail drawer."""
 
     contact = unwrap(crm_tools.get_contact_details(customer_id))
 
@@ -86,7 +97,19 @@ def customer_detail(customer_id: str):
         "contact": contact,
         "notes": crm_tools.get_contact_notes(customer_id),
         "tasks": crm_tools.get_contact_tasks(customer_id),
+        "activities": deals.get_activities(customer_id),
     }
+
+
+@router.get("/deals")
+def deal_list(
+    stage: str = Query("", max_length=40),
+    owner: str = Query("", max_length=80),
+    stalled: bool = False,
+):
+    """Deals with a per-stage summary. stalled=true keeps only stalled deals."""
+
+    return deals.list_deals(stage, owner, stalled)
 
 
 @router.get("/tasks")
@@ -117,5 +140,21 @@ def finish_task(task_id: int):
 def move_task(task_id: int, body: Reschedule):
     return unwrap(
         crm_tools.reschedule_task(task_id, body.due_date.isoformat()),
+        status_code=400,
+    )
+
+
+@router.post("/customers/{customer_id}/stage", dependencies=[Depends(same_site_only)])
+def change_stage(customer_id: str, body: StageChange):
+    return unwrap(deals.update_deal_stage(customer_id, body.stage), status_code=400)
+
+
+@router.post(
+    "/customers/{customer_id}/activities",
+    dependencies=[Depends(same_site_only)],
+)
+def add_activity(customer_id: str, body: NewActivity):
+    return unwrap(
+        deals.log_contact(customer_id, body.channel, body.summary),
         status_code=400,
     )

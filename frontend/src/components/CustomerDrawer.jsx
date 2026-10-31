@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { isOpenStage, STAGE_ORDER, STAGES } from '../constants/stages'
 import { useApi } from '../hooks/useApi'
+import { changeStage } from '../services/dealsApi'
 import { completeTask } from '../services/tasksApi'
 import { daysBetween, formatDate, formatMoney } from '../utils/format'
-import { isOpenStage } from '../constants/stages'
+import ContactForm from './ContactForm'
 import StageBadge from './StageBadge'
+import StageProgress from './StageProgress'
 import TaskForm from './TaskForm'
 import Badge from './ui/Badge'
 import Button from './ui/Button'
@@ -11,9 +14,15 @@ import Drawer from './ui/Drawer'
 import Icon from './ui/Icon'
 import { Alert, ErrorState, LoadingState } from './ui/States'
 
-// Detail panel for one customer: company info, needs, notes, deal and tasks.
-// It loads GET /customers/{id}, which returns the contact, notes and tasks.
-export default function CustomerDrawer({ customerId, onClose, dataVersion }) {
+// Detail panel for one customer: company info, deal, tasks, notes, activity.
+// It loads GET /customers/{id}. After any change it calls onChanged(), which
+// makes App refresh every page (including this drawer) with new data.
+export default function CustomerDrawer({
+  customerId,
+  onClose,
+  dataVersion,
+  onChanged,
+}) {
   const { data, loading, error, reload } = useApi(
     customerId ? `/customers/${encodeURIComponent(customerId)}` : null,
     { refreshKey: dataVersion }
@@ -36,19 +45,26 @@ export default function CustomerDrawer({ customerId, onClose, dataVersion }) {
 
       {error && <ErrorState message={error} onRetry={reload} />}
 
-      {/* key resets the form and messages when another customer is opened */}
-      {data && <CustomerBody key={customerId} data={data} reload={reload} />}
+      {/* key resets the forms and messages when another customer is opened */}
+      {data && (
+        <CustomerBody key={customerId} data={data} onChanged={onChanged} />
+      )}
     </Drawer>
   )
 }
 
-function CustomerBody({ data, reload }) {
-  const { contact, notes, tasks, as_of: today } = data
+function CustomerBody({ data, onChanged }) {
+  const { contact, notes, tasks, activities, as_of: today } = data
 
-  const [showForm, setShowForm] = useState(false)
+  const [showTaskForm, setShowTaskForm] = useState(false)
+  const [showContactForm, setShowContactForm] = useState(false)
   const [notice, setNotice] = useState('')
   const [actionError, setActionError] = useState('')
   const [busyTaskId, setBusyTaskId] = useState(null)
+
+  // The stage picked in the dropdown (not saved until "Update stage").
+  const [newStage, setNewStage] = useState(contact.deal_stage)
+  const [savingStage, setSavingStage] = useState(false)
 
   const open = isOpenStage(contact.deal_stage)
   const overdueDays =
@@ -57,9 +73,15 @@ function CustomerBody({ data, reload }) {
       : 0
 
   function handleCreated(task) {
-    setShowForm(false)
+    setShowTaskForm(false)
     setNotice(`Task added: “${task.title}”, due ${formatDate(task.due_date)}.`)
-    reload() // fetch the customer again so the new task appears
+    onChanged()
+  }
+
+  function handleLogged() {
+    setShowContactForm(false)
+    setNotice('Contact logged.')
+    onChanged()
   }
 
   async function handleComplete(task) {
@@ -70,11 +92,27 @@ function CustomerBody({ data, reload }) {
     try {
       await completeTask(task.task_id)
       setNotice(`Task completed: “${task.title}”.`)
-      reload()
+      onChanged()
     } catch (requestError) {
       setActionError(requestError.message)
     } finally {
       setBusyTaskId(null)
+    }
+  }
+
+  async function handleStage() {
+    setSavingStage(true)
+    setActionError('')
+    setNotice('')
+
+    try {
+      await changeStage(contact.customer_id, newStage)
+      setNotice(`Stage changed to ${STAGES[newStage].label}.`)
+      onChanged()
+    } catch (requestError) {
+      setActionError(requestError.message)
+    } finally {
+      setSavingStage(false)
     }
   }
 
@@ -102,17 +140,38 @@ function CustomerBody({ data, reload }) {
       </section>
 
       <section className="customer__section">
-        <h3>Business need</h3>
-        <p>{contact.business_need || 'No business need recorded.'}</p>
+        <h3>Deal progress</h3>
+        <StageProgress stage={contact.deal_stage} />
+
+        <div className="deal-box">
+          <select
+            className="select"
+            value={newStage}
+            onChange={event => setNewStage(event.target.value)}
+            aria-label="New deal stage"
+          >
+            {STAGE_ORDER.map(id => (
+              <option key={id} value={id}>
+                {STAGES[id].label}
+              </option>
+            ))}
+          </select>
+
+          <Button
+            size="sm"
+            variant="primary"
+            loading={savingStage}
+            disabled={newStage === contact.deal_stage}
+            onClick={handleStage}
+          >
+            Update stage
+          </Button>
+        </div>
       </section>
 
       <section className="customer__section">
-        <h3>Last contact</h3>
-        <p className="muted">
-          {formatDate(contact.last_contact_date)}
-          {contact.last_contact_channel && ` · ${contact.last_contact_channel}`}
-        </p>
-        <p>{contact.last_interaction_summary || 'No interaction summary.'}</p>
+        <h3>Business need</h3>
+        <p>{contact.business_need || 'No business need recorded.'}</p>
       </section>
 
       <section className="customer__section">
@@ -132,20 +191,20 @@ function CustomerBody({ data, reload }) {
         <div className="customer__section-head">
           <h3>Tasks</h3>
 
-          {!showForm && (
-            <Button size="sm" variant="primary" onClick={() => setShowForm(true)}>
+          {!showTaskForm && (
+            <Button size="sm" variant="primary" onClick={() => setShowTaskForm(true)}>
               <Icon name="plus" size={14} />
               Add follow-up
             </Button>
           )}
         </div>
 
-        {showForm && (
+        {showTaskForm && (
           <TaskForm
             today={today}
             customerId={contact.customer_id}
             onCreated={handleCreated}
-            onCancel={() => setShowForm(false)}
+            onCancel={() => setShowTaskForm(false)}
           />
         )}
 
@@ -179,6 +238,47 @@ function CustomerBody({ data, reload }) {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="customer__section">
+        <div className="customer__section-head">
+          <h3>Activity</h3>
+
+          {!showContactForm && (
+            <Button size="sm" onClick={() => setShowContactForm(true)}>
+              <Icon name="plus" size={14} />
+              Log contact
+            </Button>
+          )}
+        </div>
+
+        {showContactForm && (
+          <ContactForm
+            customerId={contact.customer_id}
+            onLogged={handleLogged}
+            onCancel={() => setShowContactForm(false)}
+          />
+        )}
+
+        {activities.length === 0 ? (
+          <p className="muted">No activity yet.</p>
+        ) : (
+          <ol className="timeline">
+            {activities.map(item => (
+              <li key={item.activity_id} className="timeline__item">
+                <p className="timeline__meta">
+                  <Badge tone={item.kind === 'stage_change' ? 'warning' : 'neutral'}>
+                    {item.kind === 'stage_change' ? 'Stage' : item.channel}
+                  </Badge>
+                  <span className="muted">{formatDate(item.occurred_at)}</span>
+                </p>
+                <p className="timeline__text" dir="auto">
+                  {item.summary}
+                </p>
+              </li>
+            ))}
+          </ol>
         )}
       </section>
 

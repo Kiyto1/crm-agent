@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { isOpenStage, STAGES } from '../constants/stages'
 import { useApi } from '../hooks/useApi'
 import { formatDate, formatMoney } from '../utils/format'
-import CustomerDrawer from '../components/CustomerDrawer'
 import StageBadge from '../components/StageBadge'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -10,9 +9,9 @@ import Icon from '../components/ui/Icon'
 import Input from '../components/ui/Input'
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/States'
 
-// `param` is the customer ID from the URL (#/customers/CON-21066).
-// When it is set, the detail drawer is open for that customer.
-export default function CustomersPage({ param, dataVersion }) {
+// Clicking a row opens the customer drawer (#/customers/CON-21066).
+// The drawer itself is rendered by App, so it also works on the Deals page.
+export default function CustomersPage({ dataVersion }) {
   // searchText is what the user typed; search is the debounced value
   // that is sent to the server, so we don't ask on every keystroke.
   const [searchText, setSearchText] = useState('')
@@ -45,10 +44,6 @@ export default function CustomersPage({ param, dataVersion }) {
 
   function openCustomer(id) {
     window.location.hash = `#/customers/${encodeURIComponent(id)}`
-  }
-
-  function closeDrawer() {
-    window.location.hash = '#/customers'
   }
 
   const items = list.data?.items
@@ -181,12 +176,6 @@ export default function CustomersPage({ param, dataVersion }) {
           </table>
         </div>
       )}
-
-      <CustomerDrawer
-        customerId={param}
-        onClose={closeDrawer}
-        dataVersion={dataVersion}
-      />
     </div>
   )
 }

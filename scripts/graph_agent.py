@@ -30,6 +30,7 @@ from crm_tools import (
     find_inactive_contacts,
     reschedule_task,
 )
+from deals import update_deal_stage, log_contact
 from notes_tools import list_notes
 from rag import search_crm_knowledge
 from gemini_limits import reserve_gemini_call
@@ -59,12 +60,21 @@ tools = {
     "get_contact_notes": get_contact_notes,
     "find_inactive_contacts": find_inactive_contacts,
     "reschedule_task": reschedule_task,
+    "update_deal_stage": update_deal_stage,
+    "log_contact": log_contact,
     "list_notes": list_notes,
     "search_crm_knowledge": search_crm_knowledge,
 }
 
 # These tools change the database and require approval.
-write_tools = {"create_task", "complete_task", "add_note", "reschedule_task"}
+write_tools = {
+    "create_task",
+    "complete_task",
+    "add_note",
+    "reschedule_task",
+    "update_deal_stage",
+    "log_contact",
+}
 
 # Give Gemini descriptions of the available tools.
 llm_with_tools = llm.bind_tools(list(tools.values()))
@@ -143,12 +153,21 @@ def model_node(state: AgentState) -> dict:
             "recent activity or contact (default 30 days). "
             "Use the exact total it returns and say when the list is partial. "
 
+            "DEALS: "
+            "Use update_deal_stage to move a customer's deal to another "
+            "stage (new, qualified, demo_scheduled, proposal_sent, "
+            "negotiation, won, lost). "
+            "Use log_contact to record a call, email, meeting or WhatsApp "
+            "contact that already happened. It ends a stalled deal. "
+            "Never log a contact that the user did not describe. "
+
             "UNSUPPORTED REQUESTS: "
             "You can search and read customers, notes and tasks, find "
             "overdue follow-ups and inactive customers, and after approval "
-            "create, complete or reschedule tasks and add notes. "
-            "You cannot edit or delete customers, change deal stages or "
-            "values, import or export files, send messages or emails, or "
+            "create, complete or reschedule tasks, add notes, change a "
+            "deal's stage and log contacts. "
+            "You cannot edit or delete customers, change deal values, "
+            "import or export files, send messages or emails, or "
             "book meetings. "
             "If asked for something unsupported, say plainly that you "
             "cannot do it, then suggest one related supported action. "

@@ -21,6 +21,7 @@
 
 @import './pages/overview.css';
 @import './pages/customers.css';
+@import './pages/deals.css';
 
 @import './chat/assistant-panel.css';
 @import './chat/conversations.css';

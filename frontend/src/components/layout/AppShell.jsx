@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { APP_NAME, ROUTES } from '../../routes'
-import Badge from '../ui/Badge'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 import AboutDemo from './AboutDemo'
@@ -96,11 +95,6 @@ export default function AppShell({
                 >
                   <Icon name={item.icon} />
                   <span>{item.label}</span>
-
-                  {/* Be honest about which pages are not built yet. */}
-                  {!item.ready && (
-                    <Badge className="nav-link__badge">Soon</Badge>
-                  )}
                 </a>
               </li>
             ))}

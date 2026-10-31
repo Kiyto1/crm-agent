@@ -9,8 +9,19 @@ export const STAGES = {
   lost: { label: 'Lost', tone: 'danger' },
 }
 
-// Pipeline order, used when listing stages.
+// Every stage, in pipeline order (used for lists and dropdowns).
 export const STAGE_ORDER = Object.keys(STAGES)
+
+// The path a deal takes to be won. "lost" can happen at any point,
+// so it is not a step on this path.
+export const PIPELINE = [
+  'new',
+  'qualified',
+  'demo_scheduled',
+  'proposal_sent',
+  'negotiation',
+  'won',
+]
 
 // Won and lost deals are finished, so they are not "open".
 export function isOpenStage(stage) {

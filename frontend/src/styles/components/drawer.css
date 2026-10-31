@@ -19,6 +19,15 @@
   box-shadow: var(--shadow-md);
 }
 
+/* On wider screens start below the top bar, so the Assistant and theme
+   buttons stay clickable while a customer is open. */
+@media (min-width: 701px) {
+  .drawer {
+    top: var(--topbar-height);
+    height: calc(100dvh - var(--topbar-height));
+  }
+}
+
 .drawer[open] {
   animation: drawer-in 0.22s ease;
 }

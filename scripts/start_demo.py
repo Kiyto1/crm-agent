@@ -15,7 +15,12 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 
 def initialize_data():
-    """Create missing tables while preserving existing records."""
+    """Create missing tables, then migrate to the current schema.
+
+    Existing records are kept. A brand-new install imports the CSV into the
+    old flat `contacts` table first, and migrate() then splits it into
+    companies, people, deals and activities.
+    """
 
     data_dir = PROJECT_ROOT / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -23,7 +28,16 @@ def initialize_data():
     with closing(
         sqlite3.connect(data_dir / "crm.db")
     ) as connection:
+        # `contacts` is a table before migration and a view after it.
         contacts_exist = connection.execute(
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE name = 'contacts'
+            """
+        ).fetchone()
+
+        contacts_is_table = connection.execute(
             """
             SELECT 1
             FROM sqlite_master
@@ -48,13 +62,21 @@ def initialize_data():
         from init_db import initialize_database
 
         initialize_database()
+        contacts_is_table = True
 
-    # These scripts create their tables only if they are missing.
-    for script in ("init_tasks.py", "init_notes.py"):
-        runpy.run_path(
-            str(PROJECT_ROOT / "scripts" / script),
-            run_name="__main__",
-        )
+    # These scripts build tasks and notes for the old flat table, so they
+    # only run before migration (they cannot index the new `contacts` view).
+    if contacts_is_table:
+        for script in ("init_tasks.py", "init_notes.py"):
+            runpy.run_path(
+                str(PROJECT_ROOT / "scripts" / script),
+                run_name="__main__",
+            )
+
+    # Does nothing if the database is already migrated.
+    from migrate_schema import migrate
+
+    print(migrate())
 
 
 if __name__ == "__main__":
