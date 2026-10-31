@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { formatSessionTime } from '../utils/formatSessionTime'
 import { getDisplayTitle } from '../utils/sessionMeta'
 import { groupSessionsByDate } from '../utils/groupSessions'
+import Button from './ui/Button'
+import Icon from './ui/Icon'
 
 // Headings for each date group (keys match groupSessionsByDate's output)
 const GROUP_LABELS = {
@@ -81,13 +83,9 @@ function SessionRow({
           aria-label="Rename conversation"
           autoFocus
         />
-        <button
-          type="button"
-          className="btn btn--xs btn--primary"
-          onClick={commitRename}
-        >
+        <Button variant="primary" size="sm" onClick={commitRename}>
           Save
-        </button>
+        </Button>
       </div>
     )
   }
@@ -196,8 +194,10 @@ function SessionGroup({
   )
 }
 
-// ---------- The sidebar itself ----------
-export default function Sidebar({
+// ---------- The conversation list itself ----------
+// On wide screens it is a column beside the chat; on narrow screens CSS turns
+// it into a slide-in drawer (the page decides when it is `open`).
+export default function ConversationList({
   metaTick,
   open,
   onClose,
@@ -214,35 +214,29 @@ export default function Sidebar({
 
   return (
     <aside
-      id="conversation-sidebar"
-      className={open ? 'sidebar sidebar--open' : 'sidebar'} // --open shows it on mobile
+      id="conversation-list"
+      className={open ? 'conversations conversations--open' : 'conversations'}
       aria-label="Conversation history"
     >
-      {/* Brand and New chat button */}
-      <div className="sidebar__top">
-        <div className="sidebar__brand">
-          <span className="sidebar__mark" aria-hidden="true">
-            ✦
-          </span>
-          <span>CRM Assistant</span>
-        </div>
+      <Button
+        variant="primary"
+        block
+        onClick={() => {
+          onNewChat()
+          onClose()
+        }}
+        disabled={busy}
+      >
+        <Icon name="plus" size={16} />
+        New chat
+      </Button>
 
-        <button
-          type="button"
-          className="btn btn--primary btn--block sidebar__new"
-          onClick={onNewChat}
-          disabled={busy}
-        >
-          New chat
-        </button>
-      </div>
-
-      {/* Chat list */}
-      <nav className="sidebar__nav" aria-label="Saved conversations">
+      <nav className="conversations__list" aria-label="Saved conversations">
         {sessions.length === 0 ? (
-          <p className="sidebar__empty">Your conversations will appear here.</p>
+          <p className="conversations__empty">
+            Your conversations will appear here.
+          </p>
         ) : (
-          // Loop over Today / Yesterday / Earlier and render each group
           Object.entries(GROUP_LABELS).map(([key, label]) => (
             <SessionGroup
               key={key}
@@ -262,7 +256,7 @@ export default function Sidebar({
         )}
       </nav>
 
-      <p className="sidebar__note">
+      <p className="conversations__note">
         Conversations and pending approvals are saved on the server.
       </p>
     </aside>

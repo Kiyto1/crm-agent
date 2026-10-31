@@ -1,9 +1,11 @@
+import Button from './ui/Button'
+
 export default function ApprovalPanel({ proposal, busy, onApprove, onReject }) {
   if (!proposal) return null
 
   return (
     <section className="approval-panel" aria-label="Approval required">
-      <div className="approval-panel__header">
+      <div>
         <p className="approval-panel__eyebrow">Approval required</p>
         <h2 className="approval-panel__title">Review proposed changes</h2>
         <p className="approval-panel__lead">
@@ -38,23 +40,13 @@ export default function ApprovalPanel({ proposal, busy, onApprove, onReject }) {
       </div>
 
       <div className="approval-panel__actions">
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={() => onApprove(true)}
-          disabled={busy}
-        >
+        <Button variant="primary" onClick={() => onApprove(true)} disabled={busy}>
           Approve all
-        </button>
+        </Button>
 
-        <button
-          type="button"
-          className="btn btn--ghost"
-          onClick={() => onReject(false)}
-          disabled={busy}
-        >
+        <Button variant="ghost" onClick={() => onReject(false)} disabled={busy}>
           Reject
-        </button>
+        </Button>
       </div>
     </section>
   )

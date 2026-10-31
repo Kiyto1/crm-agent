@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 from pydantic import BaseModel, Field, StrictBool
 
+from dashboard_api import router as dashboard_router
 from graph_agent import graph
 from session_store import (
     save_session_owner,
@@ -15,6 +16,9 @@ from session_store import (
 
 
 app = FastAPI(title="CRM Agent API")
+
+# Dashboard pages (overview, customers, tasks) use these extra endpoints.
+app.include_router(dashboard_router)
 
 # Prevent overlapping requests from changing the shared graph state.
 graph_lock = Lock()
@@ -341,4 +345,4 @@ def get_session(
                 }
             )
 
-        return result
+        return result
