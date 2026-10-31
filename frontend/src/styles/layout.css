@@ -148,7 +148,6 @@
 }
 
 /* ---------- Narrow screens: navigation becomes a slide-in drawer ---------- */
-/* 900px is repeated in chat/assistant-page.css and chat/conversations.css. */
 @media (max-width: 900px) {
   .shell__nav {
     position: fixed;

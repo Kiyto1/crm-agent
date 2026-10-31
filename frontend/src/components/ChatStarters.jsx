@@ -1,18 +1,18 @@
-import { SUGGESTIONS } from '../constants/suggestions'
 import SuggestionCard from './SuggestionCard'
 
 // Shown in an empty conversation so visitors never face a blank box.
-export default function ChatStarters({ onSelectPrompt, disabled }) {
+// `starters` come from getStarters() and depend on the current page.
+export default function ChatStarters({ starters, onSelectPrompt, disabled }) {
   return (
     <div className="starters">
-      <h2 className="starters__title">What would you like to work on?</h2>
+      <h2 className="starters__title">How can I help?</h2>
       <p className="starters__lead">
-        Pick a starter to fill the message box, then press send. Changes are
-        only saved after you approve them.
+        Pick a suggestion to fill the message box, then press send. Changes
+        are only saved after you approve them.
       </p>
 
       <div className="starters__grid" role="list">
-        {SUGGESTIONS.map(item => (
+        {starters.map(item => (
           <div key={item.id} role="listitem">
             <SuggestionCard
               icon={item.icon}

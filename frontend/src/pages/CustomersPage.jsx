@@ -12,7 +12,7 @@ import { EmptyState, ErrorState, LoadingState } from '../components/ui/States'
 
 // `param` is the customer ID from the URL (#/customers/CON-21066).
 // When it is set, the detail drawer is open for that customer.
-export default function CustomersPage({ param }) {
+export default function CustomersPage({ param, dataVersion }) {
   // searchText is what the user typed; search is the debounced value
   // that is sent to the server, so we don't ask on every keystroke.
   const [searchText, setSearchText] = useState('')
@@ -28,7 +28,10 @@ export default function CustomersPage({ param }) {
 
   // The filters become the URL's query string: /customers?search=...&stage=...
   const query = new URLSearchParams({ search, stage, owner }).toString()
-  const list = useApi(`/customers?${query}`, { keepPrevious: true })
+  const list = useApi(`/customers?${query}`, {
+    keepPrevious: true,
+    refreshKey: dataVersion,
+  })
   const filters = useApi('/customers/filters')
 
   const hasFilters = Boolean(searchText || stage || owner)
@@ -179,7 +182,11 @@ export default function CustomersPage({ param }) {
         </div>
       )}
 
-      <CustomerDrawer customerId={param} onClose={closeDrawer} />
+      <CustomerDrawer
+        customerId={param}
+        onClose={closeDrawer}
+        dataVersion={dataVersion}
+      />
     </div>
   )
 }

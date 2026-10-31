@@ -30,7 +30,6 @@ export const ROUTES = [
     icon: 'tasks',
     ready: true,
   },
-  { id: 'assistant', label: 'Assistant', icon: 'sparkle', ready: true },
 ]
 
 // Where visitors land.

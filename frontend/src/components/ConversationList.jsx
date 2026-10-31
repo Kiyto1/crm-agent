@@ -195,12 +195,9 @@ function SessionGroup({
 }
 
 // ---------- The conversation list itself ----------
-// On wide screens it is a column beside the chat; on narrow screens CSS turns
-// it into a slide-in drawer (the page decides when it is `open`).
+// Shown inside the assistant panel when the user opens "Chats".
 export default function ConversationList({
   metaTick,
-  open,
-  onClose,
   sessions,
   sessionId,
   busy,
@@ -213,20 +210,8 @@ export default function ConversationList({
   const groups = groupSessionsByDate(sessions) // { today, yesterday, earlier }
 
   return (
-    <aside
-      id="conversation-list"
-      className={open ? 'conversations conversations--open' : 'conversations'}
-      aria-label="Conversation history"
-    >
-      <Button
-        variant="primary"
-        block
-        onClick={() => {
-          onNewChat()
-          onClose()
-        }}
-        disabled={busy}
-      >
+    <section className="conversations" aria-label="Conversation history">
+      <Button variant="primary" block onClick={onNewChat} disabled={busy}>
         <Icon name="plus" size={16} />
         New chat
       </Button>
@@ -245,10 +230,7 @@ export default function ConversationList({
               sessions={groups[key]}
               sessionId={sessionId}
               busy={busy}
-              onOpen={id => {
-                onOpenSession(id)
-                onClose() // close the drawer on mobile after picking a chat
-              }}
+              onOpen={onOpenSession}
               onRename={onRenameSession}
               onDelete={onDeleteSession}
             />
@@ -259,6 +241,6 @@ export default function ConversationList({
       <p className="conversations__note">
         Conversations and pending approvals are saved on the server.
       </p>
-    </aside>
+    </section>
   )
 }

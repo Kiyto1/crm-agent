@@ -1,102 +1,62 @@
 /* ============================================================
-   APPROVAL: review proposed database changes
+   APPROVAL: compact card listing the changes the assistant PROPOSES
    ============================================================ */
-.approval-panel {
-  margin: var(--space-4) 0;
-  padding: var(--space-4);
+.approval {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3);
   background: var(--color-warning-surface);
   border: 1px solid var(--color-warning-border);
   border-radius: var(--radius-lg);
 }
 
-.approval-panel__eyebrow {
-  margin: 0;
-  font-size: var(--text-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-warning-text);
-}
-
-.approval-panel__title {
-  margin: var(--space-1) 0;
-  font-size: var(--text-lg);
-  color: var(--color-warning-text);
-}
-
-.approval-panel__lead {
-  margin: 0 0 var(--space-4);
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-}
-
-.approval-panel__changes {
+.approval__header {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
 }
 
-.approval-card {
-  padding: var(--space-4);
+.approval__card {
+  padding: var(--space-3);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
 }
 
-.approval-card__name {
-  margin: 0 0 var(--space-3);
+.approval__name {
+  margin: 0 0 var(--space-2);
   font-size: var(--text-sm);
   font-weight: 700;
-  text-transform: capitalize;
 }
 
-.approval-card__fields {
+.approval__fields {
   margin: 0;
 }
 
-.approval-card__row {
+.approval__row {
   display: grid;
-  grid-template-columns: minmax(96px, 132px) minmax(0, 1fr);
-  gap: var(--space-1) var(--space-3);
-  margin-bottom: var(--space-2);
-  font-size: var(--text-sm);
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
 }
 
-.approval-card__row:last-child {
+.approval__row:last-child {
   margin-bottom: 0;
 }
 
-.approval-card__row dt {
+.approval__row dt {
   color: var(--color-text-muted);
-  text-transform: capitalize;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.approval-card__row dd {
+.approval__row dd {
   margin: 0;
-  color: var(--color-text-secondary);
+  color: var(--color-text);
   overflow-wrap: anywhere;
 }
 
-.approval-panel__actions {
+.approval__actions {
   display: flex;
-  flex-wrap: wrap;
   gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-
-@media (max-width: 560px) {
-  .approval-panel__actions {
-    flex-direction: column;
-  }
-
-  .approval-panel__actions .btn {
-    width: 100%;
-  }
-
-  .approval-card__row {
-    grid-template-columns: 1fr;
-    gap: var(--space-1);
-  }
 }

@@ -16,8 +16,10 @@ const ACTIVITY_LABELS = {
 
 // Everything on this page comes from GET /overview, which calculates the
 // numbers from the database records on each request.
-export default function OverviewPage() {
-  const { data, loading, error, reload } = useApi('/overview')
+export default function OverviewPage({ dataVersion }) {
+  const { data, loading, error, reload } = useApi('/overview', {
+    refreshKey: dataVersion,
+  })
 
   if (error && !data) {
     return (

@@ -7,12 +7,17 @@ import { apiRequest } from '../api'
 // - keepPrevious: while a new request runs (for example after typing in a
 //   filter), keep showing the old data instead of blanking the table.
 // - reload() fetches again, which pages call after saving a change.
-export function useApi(endpoint, { keepPrevious = false } = {}) {
+// - refreshKey: a number from App that goes up whenever the assistant saves
+//   something. A new value means "fetch again", so pages update by themselves.
+export function useApi(
+  endpoint,
+  { keepPrevious = false, refreshKey = 0 } = {}
+) {
   const [reloadCount, setReloadCount] = useState(0)
 
   // Every request gets a key. The stored result remembers which key it
   // answers, so an old, slow response can never overwrite a newer one.
-  const key = endpoint ? `${endpoint}#${reloadCount}` : null
+  const key = endpoint ? `${endpoint}#${reloadCount}#${refreshKey}` : null
   const [result, setResult] = useState({
     key: null,
     endpoint: null,

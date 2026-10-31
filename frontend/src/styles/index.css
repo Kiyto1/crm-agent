@@ -22,7 +22,7 @@
 @import './pages/overview.css';
 @import './pages/customers.css';
 
-@import './chat/assistant-page.css';
+@import './chat/assistant-panel.css';
 @import './chat/conversations.css';
 @import './chat/messages.css';
 @import './chat/markdown.css';

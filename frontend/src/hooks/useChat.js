@@ -32,7 +32,9 @@ function writeStoredSession(id) {
 // All chat state and server calls live here (moved out of App.jsx).
 // App creates one instance, so the conversation survives page changes
 // and a later AI side panel can share it.
-export function useChat() {
+// onDataChanged runs after the user approves changes, so App can refresh the
+// dashboard pages that show the data the assistant just modified.
+export function useChat({ onDataChanged } = {}) {
   // Messages and conversations displayed by the interface.
   const [messages, setMessages] = useState([])
   const [sessions, setSessions] = useState([])
@@ -45,6 +47,9 @@ export function useChat() {
   const [proposal, setProposal] = useState(null)
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState('')
+
+  // Short confirmation shown after an approval (cleared by the next request).
+  const [notice, setNotice] = useState('')
 
   // Trigger a render after locally renaming or hiding conversations.
   const [metaVersion, setMetaVersion] = useState(0)
@@ -112,6 +117,7 @@ export function useChat() {
     inFlight.current = true
     setBusy(true)
     setError('')
+    setNotice('')
 
     try {
       await task()
@@ -246,6 +252,13 @@ export function useChat() {
         })
 
         handleResult(data)
+
+        // Approved changes have run, so tell the dashboard to fetch fresh
+        // data. The assistant's reply says whether each change succeeded.
+        if (approved) {
+          setNotice('Approved. Dashboard data refreshed.')
+          if (onDataChanged) onDataChanged()
+        }
       } catch (requestError) {
         // Reload the conversation if the approval was already handled
         // or no longer matches the server's current state.
@@ -274,6 +287,7 @@ export function useChat() {
     setProposal(null)
     setInput('')
     setError('')
+    setNotice('')
   }
 
 
@@ -304,6 +318,7 @@ export function useChat() {
     proposal,
     busy,
     error,
+    notice,
     metaVersion,
 
     // derived conditions

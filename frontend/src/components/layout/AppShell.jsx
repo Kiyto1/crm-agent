@@ -7,12 +7,16 @@ import AboutDemo from './AboutDemo'
 
 const THEME_ICON = { light: 'sun', dark: 'moon', system: 'monitor' }
 
-// The frame around every page: navigation, top bar, and the content area.
+// The frame around every page: navigation, top bar, the content area and
+// (on the right) the assistant panel, which App passes in as `panel`.
 export default function AppShell({
   route,
   theme,
   themeLabel,
   onCycleTheme,
+  assistantOpen,
+  onToggleAssistant,
+  panel,
   children,
 }) {
   const [navOpen, setNavOpen] = useState(false) // mobile drawer
@@ -46,7 +50,7 @@ export default function AppShell({
   }, [navOpen])
 
   return (
-    <div className="shell">
+    <div className={assistantOpen ? 'shell shell--panel-open' : 'shell'}>
       {/* The URL hash is used for routing, so this link cannot
           be a plain #main-content anchor. Focus the area directly. */}
       <a
@@ -144,6 +148,16 @@ export default function AppShell({
             >
               <Icon name={THEME_ICON[theme] || 'monitor'} />
             </Button>
+
+            <Button
+              variant="primary"
+              aria-pressed={assistantOpen}
+              aria-controls="assistant-panel"
+              onClick={onToggleAssistant}
+            >
+              <Icon name="sparkle" size={16} />
+              Assistant
+            </Button>
           </div>
         </header>
 
@@ -156,6 +170,8 @@ export default function AppShell({
           {children}
         </main>
       </div>
+
+      {panel}
 
       <AboutDemo open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>

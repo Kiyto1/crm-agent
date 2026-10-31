@@ -22,7 +22,7 @@ const FILTERS = [
   { label: 'All', status: '' },
 ]
 
-export default function TasksPage() {
+export default function TasksPage({ dataVersion }) {
   const [status, setStatus] = useState('Open')
   const [showForm, setShowForm] = useState(false)
 
@@ -34,7 +34,10 @@ export default function TasksPage() {
   const [notice, setNotice] = useState('')
   const [actionError, setActionError] = useState('')
 
-  const list = useApi(`/tasks?status=${status}`, { keepPrevious: true })
+  const list = useApi(`/tasks?status=${status}`, {
+    keepPrevious: true,
+    refreshKey: dataVersion,
+  })
 
   // The customer dropdown is only needed while the form is open.
   const customers = useApi(showForm ? '/customers' : null)

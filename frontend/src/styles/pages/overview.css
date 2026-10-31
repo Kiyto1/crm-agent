@@ -1,9 +1,11 @@
 /* ============================================================
    OVERVIEW PAGE
    ============================================================ */
+/* Four cards in a row when there is room, otherwise two by two.
+   The assistant panel takes 400px, so it counts as "less room". */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-4);
 }
 
@@ -71,8 +73,30 @@
   color: var(--color-text-secondary);
 }
 
+@media (max-width: 1280px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1281px) and (max-width: 1700px) {
+  .shell--panel-open .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shell--panel-open .overview__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   .overview__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .stat-grid {
     grid-template-columns: 1fr;
   }
 }

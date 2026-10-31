@@ -13,9 +13,10 @@ import { Alert, ErrorState, LoadingState } from './ui/States'
 
 // Detail panel for one customer: company info, needs, notes, deal and tasks.
 // It loads GET /customers/{id}, which returns the contact, notes and tasks.
-export default function CustomerDrawer({ customerId, onClose }) {
+export default function CustomerDrawer({ customerId, onClose, dataVersion }) {
   const { data, loading, error, reload } = useApi(
-    customerId ? `/customers/${encodeURIComponent(customerId)}` : null
+    customerId ? `/customers/${encodeURIComponent(customerId)}` : null,
+    { refreshKey: dataVersion }
   )
 
   const contact = data?.contact
@@ -31,7 +32,7 @@ export default function CustomerDrawer({ customerId, onClose }) {
           : customerId
       }
     >
-      {loading && <LoadingState>Loading customer…</LoadingState>}
+      {loading && !data && <LoadingState>Loading customer…</LoadingState>}
 
       {error && <ErrorState message={error} onRetry={reload} />}
 

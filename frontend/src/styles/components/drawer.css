@@ -1,10 +1,11 @@
 /* ============================================================
-   DRAWER: native <dialog> that slides in from the right
+   DRAWER: non-modal <dialog> that slides in from the right
    ============================================================ */
 .drawer {
   /* Replace the browser's centered-dialog placement. */
   position: fixed;
   inset: 0 0 0 auto;
+  z-index: 30; /* above the page, below the assistant panel (60) */
   margin: 0;
   width: min(480px, 100vw);
   height: 100dvh;
@@ -22,8 +23,9 @@
   animation: drawer-in 0.22s ease;
 }
 
-.drawer::backdrop {
-  background: rgba(0, 0, 0, 0.4);
+/* Non-modal: no backdrop, so the page and the assistant stay usable. */
+.drawer__title:focus {
+  outline: none;
 }
 
 .drawer__panel {
@@ -60,6 +62,14 @@
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-5);
+}
+
+/* With the assistant docked on the right (wide screens), slide the drawer
+   to sit beside it instead of underneath it. */
+@media (min-width: 1101px) {
+  .shell--panel-open .drawer {
+    right: var(--panel-width);
+  }
 }
 
 @keyframes drawer-in {
