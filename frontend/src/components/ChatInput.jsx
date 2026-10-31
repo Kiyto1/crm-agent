@@ -1,38 +1,36 @@
 import { useEffect, useRef } from 'react'
+import Button from './ui/Button'
 
 // Message box with auto-growing textarea and a Send button.
-// Fully controlled by the parent: `value` and `onChange` come from App's `input` state.
+// Fully controlled by the parent: `value` and `onChange` come from useChat.
 export default function ChatInput({
   value,
   onChange,
   onSend,
   disabled, // block typing/sending (busy or waiting for approval)
-  loading, // show the "Sending" spinner on the button
+  loading, // show the spinner on the button
   placeholder,
 }) {
-  const textareaRef = useRef(null) // the <textarea> DOM element
+  const textareaRef = useRef(null)
 
   // Auto-resize: grow with the text, up to a max height of 160px
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
 
-    el.style.height = 'auto' // reset first so it can shrink when text is deleted
+    el.style.height = 'auto' // reset first so it can shrink
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
   }, [value])
+
+  const canSend = !disabled && Boolean(value.trim())
 
   // Enter sends, Shift+Enter inserts a new line
   function handleKeyDown(event) {
     if (event.key !== 'Enter' || event.shiftKey) return
 
-    event.preventDefault() // stop the new line from being inserted
-    if (!disabled && !loading && value.trim()) {
-      onSend()
-    }
+    event.preventDefault()
+    if (canSend && !loading) onSend()
   }
-
-  const hasText = Boolean(value.trim()) // ignore whitespace-only input
-  const canSend = !disabled && hasText
 
   return (
     <div className="chat-input-wrap">
@@ -43,7 +41,6 @@ export default function ChatInput({
           if (canSend && !loading) onSend()
         }}
       >
-        {/* Label for screen readers only (visually hidden) */}
         <label className="sr-only" htmlFor="message">
           Your message
         </label>
@@ -54,7 +51,7 @@ export default function ChatInput({
           name="message"
           rows={1}
           value={value}
-          dir="auto" // text direction follows the content (good for Arabic + English)
+          dir="auto" // text direction follows the content (Arabic + English)
           onChange={event => onChange(event.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
@@ -62,21 +59,15 @@ export default function ChatInput({
           autoComplete="off"
         />
 
-        <button
+        <Button
           type="submit"
-          className={loading ? 'btn btn--send is-loading' : 'btn btn--send'}
-          disabled={!canSend && !loading} // stays enabled while loading so the spinner looks active
-          aria-busy={loading || undefined}
+          variant="primary"
+          className="chat-input__send"
+          loading={loading}
+          disabled={!canSend}
         >
-          {loading ? (
-            <>
-              <span className="btn-spinner" aria-hidden="true" />
-              <span>Sending</span>
-            </>
-          ) : (
-            'Send'
-          )}
-        </button>
+          {loading ? 'Sending' : 'Send'}
+        </Button>
       </form>
 
       <p className="chat-input-hint">

@@ -16,17 +16,28 @@ function applyTheme(mode) {
   }
 }
 
+// localStorage can throw (private mode, blocked cookies), so wrap it.
+function readSavedTheme() {
+  try {
+    return localStorage.getItem(STORAGE_KEY) || 'system'
+  } catch {
+    return 'system'
+  }
+}
+
 // Custom hook: manages the theme and remembers it between visits.
 export function useTheme() {
   // Start from the saved theme, or 'system' if none is saved
-  const [theme, setTheme] = useState(
-    () => localStorage.getItem(STORAGE_KEY) || 'system'
-  )
+  const [theme, setTheme] = useState(readSavedTheme)
 
   // Whenever the theme changes: update the page and save the choice
   useEffect(() => {
     applyTheme(theme)
-    localStorage.setItem(STORAGE_KEY, theme)
+    try {
+      localStorage.setItem(STORAGE_KEY, theme)
+    } catch {
+      // Storage blocked (private mode): the theme still works for this visit.
+    }
   }, [theme])
 
   // Switch to the next theme: light -> dark -> system -> light

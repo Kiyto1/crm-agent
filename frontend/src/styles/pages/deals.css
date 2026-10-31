@@ -1,0 +1,137 @@
+/* ============================================================
+   DEALS PAGE and the deal parts of the customer drawer
+   ============================================================ */
+
+/* Row of stage buttons that also filter the table. */
+.stage-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.stage-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stage-chip:hover {
+  border-color: var(--color-border-strong);
+}
+
+.stage-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.stage-chip[aria-pressed='true'] {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.stage-chip__label {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.stage-chip__count {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.stage-chip__value {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Checkbox with a label. */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+/* Six small bars: how far a deal is along the pipeline. */
+.progress {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.progress__step {
+  width: 14px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+}
+
+.progress__step.is-filled {
+  background: var(--color-brand);
+}
+
+.progress--won .progress__step.is-filled {
+  background: var(--color-success-text);
+}
+
+.progress--lost .progress__step {
+  background: var(--color-danger-border);
+}
+
+/* Stage picker inside the drawer. */
+.deal-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.deal-box .select {
+  flex: 1 1 160px;
+}
+
+/* Activity history in the drawer. */
+.timeline {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0 0 0 var(--space-4);
+  border-left: 2px solid var(--color-border);
+}
+
+.timeline__item {
+  position: relative;
+  padding-bottom: var(--space-3);
+}
+
+.timeline__item::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--space-4) - 5px);
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-brand);
+}
+
+.timeline__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.timeline__text {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
