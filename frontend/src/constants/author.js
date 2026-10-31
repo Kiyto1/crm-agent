@@ -5,6 +5,6 @@ export const AUTHOR = {
   role: 'Full-stack developer',
   summary:
     'Computer Science graduate of the Islamic University of Madinah (2026), based in Madinah, Saudi Arabia.',
-  status: 'Open to full-stack and AI developer roles in Medina and Jeddah.',
+  status: 'Open to full-stack developer roles in Medina and Jeddah.',
   stack: 'React, FastAPI, LangGraph, Gemini, SQLite, Chroma',
 }
