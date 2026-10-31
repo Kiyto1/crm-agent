@@ -3,26 +3,26 @@ import { AUTHOR } from '../../constants/author'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 
-// What the visitor can do, one line each.
+// What the visitor can do, one line each, written for a sales rep.
 const FEATURES = [
   {
     icon: 'dashboard',
-    title: 'Overview',
-    text: 'See your pipeline, overdue follow-ups and who needs attention.',
+    title: 'Start your day on the Overview',
+    text: 'See your pipeline value, overdue follow-ups and the customers who need attention.',
   },
   {
     icon: 'users',
-    title: 'Customers and Deals',
-    text: 'Search and filter, then open a customer to move the deal stage or log a contact.',
+    title: 'Work your customers and deals',
+    text: 'Open a customer to move the deal to the next stage or log a call, email or meeting.',
   },
   {
     icon: 'tasks',
-    title: 'Tasks',
-    text: 'Create, complete and reschedule follow-ups.',
+    title: 'Stay on top of follow-ups',
+    text: 'Create, complete and reschedule tasks so no deal goes quiet.',
   },
   {
     icon: 'sparkle',
-    title: 'Assistant',
+    title: 'Let the assistant help',
     text: 'Click Assistant (top right) and ask in plain language. Nothing is saved until you approve it.',
   },
 ]
@@ -66,8 +66,10 @@ export default function WelcomeDialog({ open, onClose, onLearnMore }) {
         </div>
 
         <p className="welcome__intro">
-          A demo CRM with an AI assistant. It runs on 120 fictional customers,
-          so explore freely.
+          <strong>You are a salesperson.</strong> This CRM holds your 120
+          customers and their deals (all fictional). Use the dashboard and the
+          AI assistant to decide who to follow up with today and keep every
+          deal moving.
         </p>
 
         <ul className="welcome__list">

@@ -59,10 +59,8 @@ export default function AboutDemo({ open, onClose }) {
         <section className="dialog__section">
           <h3>Built by</h3>
           <p>
-            <strong>{AUTHOR.name}</strong>, {AUTHOR.role}. {AUTHOR.summary}{' '}
-            {AUTHOR.status}
+            <strong>{AUTHOR.name}</strong> · Open to work
           </p>
-          <p>Built with {AUTHOR.stack}.</p>
         </section>
 
         <section className="dialog__section">
