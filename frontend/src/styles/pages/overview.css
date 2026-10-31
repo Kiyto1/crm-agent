@@ -1,0 +1,89 @@
+/* ============================================================
+   OVERVIEW PAGE
+   ============================================================ */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.overview__grid {
+  align-items: start;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+/* Horizontal bars: one row per pipeline stage. */
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bars__row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.bars__track {
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.bars__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  color: var(--color-text-muted);
+  transition: width 0.4s ease;
+}
+
+.bars__fill--info {
+  color: var(--color-info-text);
+}
+
+.bars__fill--warning {
+  color: var(--color-warning-text);
+}
+
+.bars__fill--success {
+  color: var(--color-success-text);
+}
+
+.bars__fill--danger {
+  color: var(--color-danger-text);
+}
+
+.bars__value {
+  min-width: 90px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 900px) {
+  .overview__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .bars__row {
+    grid-template-columns: 90px 1fr;
+  }
+
+  .bars__value {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
