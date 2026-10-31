@@ -1,0 +1,206 @@
+/* ============================================================
+   LAYOUT: the workspace shell (navigation, top bar, content area)
+   ============================================================ */
+.shell {
+  display: flex;
+  height: 100dvh;
+  max-width: 100vw;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* ---------- Navigation sidebar ---------- */
+.shell__nav {
+  width: var(--nav-width);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand__mark {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 10px var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-link:hover {
+  background: var(--color-brand-soft);
+  color: var(--color-text);
+}
+
+/* The current page is marked with aria-current, and styled from it. */
+.nav-link[aria-current='page'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.nav-link__badge {
+  margin-left: auto;
+}
+
+.shell__nav-footer {
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.nav-backdrop {
+  display: none;
+}
+
+/* ---------- Right side: top bar and content ---------- */
+.shell__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--topbar-height);
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Two classes: button.css loads later and would otherwise win. */
+.topbar .topbar__menu {
+  display: none;
+}
+
+.topbar__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.topbar__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Scrolls on its own; the Assistant page fills it with height: 100%. */
+.shell__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.shell__content:focus {
+  outline: none;
+}
+
+/* Standard page wrapper for dashboard pages. */
+.page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--space-5);
+}
+
+/* ---------- Narrow screens: navigation becomes a slide-in drawer ---------- */
+@media (max-width: 900px) {
+  .shell__nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: min(var(--nav-width), 88vw);
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    box-shadow: var(--shadow-md);
+  }
+
+  .shell__nav--open {
+    transform: translateX(0);
+  }
+
+  .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    padding: 0;
+    border: 0;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  .topbar {
+    padding: 0 var(--space-4);
+  }
+
+  .topbar .topbar__menu {
+    display: inline-flex;
+  }
+
+  .page {
+    padding: var(--space-4);
+  }
+}
+
+/* Short line under the top bar: "as of" date, result counts. */
+.page-intro {
+  margin: 0 0 var(--space-4);
+  min-height: 1.4em;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Pages stack their blocks with a consistent gap. */
+.page > * + * {
+  margin-top: var(--space-4);
+}
+
+.page > .page-intro + * {
+  margin-top: 0;
+}

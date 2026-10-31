@@ -1,0 +1,58 @@
+/* ============================================================
+   DIALOG: native <dialog> opened with showModal()
+   The browser provides focus trapping, Escape-to-close and the backdrop.
+   ============================================================ */
+.dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  padding: 0; /* padding lives on .dialog__panel so backdrop clicks are detectable */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.dialog__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+
+.dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dialog__title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.dialog__section h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-base);
+}
+
+.dialog__section p {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.dialog__section code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--color-surface-2);
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
