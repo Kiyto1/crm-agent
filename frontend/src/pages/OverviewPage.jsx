@@ -166,7 +166,7 @@ export default function OverviewPage({ dataVersion }) {
       </div>
 
       <div className="overview__grid">
-        <Card title="Pipeline by stage" className="overview__pipeline">
+        <Card title="Deals by stage" className="overview__pipeline">
           <ul className="bars">
             {stages.map(stage => (
               <li key={stage.stage} className="bars__row">

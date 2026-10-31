@@ -59,7 +59,7 @@ export default function AboutDemo({ open, onClose }) {
         <section className="dialog__section">
           <h3>Built by</h3>
           <p>
-            <strong>{AUTHOR.name}</strong> · Open to work
+            <strong>{AUTHOR.name}</strong> Full-stack developer · Open to work in Medina and Jeddah
           </p>
         </section>
 
