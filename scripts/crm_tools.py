@@ -412,6 +412,48 @@ def reschedule_task(task_id: int, due_date: str) -> dict:
         return result
 
 
+def find_inactive_contacts(days: int = 30) -> dict:
+    """Find open deals with no contact in the last `days` days.
+
+    Use this for questions like "which deals have had no recent activity".
+    Won and lost deals are excluded. Oldest contact comes first.
+    """
+
+    days = max(1, min(int(days), 365))
+    cutoff = (
+        date.fromisoformat(today_riyadh()) - timedelta(days=days)
+    ).isoformat()
+
+    closed = ",".join("?" for _ in CLOSED_STAGES)
+
+    with closing(sqlite3.connect(DB_FILE)) as connection:
+        connection.row_factory = sqlite3.Row
+
+        rows = connection.execute(
+            f"""
+            SELECT customer_id, full_name, company_name, deal_stage,
+                   deal_value_sar, last_contact_date, next_followup_date
+            FROM contacts
+            WHERE deal_stage NOT IN ({closed})
+              AND (last_contact_date IS NULL
+                   OR date(last_contact_date) < date(?))
+            ORDER BY last_contact_date IS NULL, last_contact_date ASC
+            """,
+            (*CLOSED_STAGES, cutoff),
+        ).fetchall()
+
+    items = [dict(row) for row in rows]
+
+    # Return the exact total, but only the first 15 rows to keep replies short.
+    return {
+        "days": days,
+        "no_contact_since": cutoff,
+        "total": len(items),
+        "items": items[:15],
+        "has_more": len(items) > 15,
+    }
+
+
 def get_overview() -> dict:
     """Dashboard numbers, all calculated from the current records."""
 
@@ -531,4 +573,4 @@ if __name__ == "__main__":
     for task in tasks:
         print(task)
 
-    print(f"\nTotal tasks: {len(tasks)}")
+    print(f"\nTotal tasks: {len(tasks)}")
