@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { AUTHOR } from '../../constants/author'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 
@@ -47,10 +48,21 @@ export default function AboutDemo({ open, onClose }) {
         <section className="dialog__section">
           <h3>What is this?</h3>
           <p>
-            An AI CRM assistant that helps you find customers, explore
-            business needs, save notes, and manage follow-up tasks through
-            conversation. Database changes require your approval.
+            A CRM dashboard with an AI assistant. Browse the pipeline, open
+            customers, move deals between stages, log contacts and manage
+            follow-up tasks, or ask the assistant to do it through
+            conversation. Database changes made by the assistant require your
+            approval.
           </p>
+        </section>
+
+        <section className="dialog__section">
+          <h3>Built by</h3>
+          <p>
+            <strong>{AUTHOR.name}</strong>, {AUTHOR.role}. {AUTHOR.summary}{' '}
+            {AUTHOR.status}
+          </p>
+          <p>Built with {AUTHOR.stack}.</p>
         </section>
 
         <section className="dialog__section">
@@ -63,10 +75,11 @@ export default function AboutDemo({ open, onClose }) {
             follow-up.
           </p>
           <p>
-            The CSV is imported into a SQLite database so the assistant can
-            search customer records and check follow-up dates. Notes and
-            tasks created during the demo are stored separately in the
-            database; they do not change the original CSV.
+            The CSV is imported into a SQLite database and split into
+            companies, people, deals and activities. The dashboard and the
+            assistant read and change the same records. Changes made during
+            the demo live in the database; they do not change the original
+            CSV.
           </p>
         </section>
 

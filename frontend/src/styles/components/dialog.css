@@ -56,3 +56,95 @@
   font-size: 0.85em;
   overflow-wrap: anywhere;
 }
+
+/* ---------- Welcome dialog ---------- */
+.welcome__intro {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.welcome__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.welcome__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.welcome__icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--color-brand-soft);
+  color: var(--color-text);
+}
+
+.welcome__item p {
+  margin: 0;
+}
+
+.welcome__title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.welcome__text {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.welcome__try {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.welcome__author {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.welcome__author p {
+  margin: 0;
+}
+
+.welcome__avatar {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--color-brand);
+  color: var(--color-brand-on);
+  font-weight: 700;
+}
+
+.welcome__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 560px) {
+  .welcome__actions .btn {
+    flex: 1 1 100%;
+  }
+}

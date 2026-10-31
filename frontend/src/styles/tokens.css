@@ -37,7 +37,7 @@
   /* layout */
   --nav-width: 248px;
   --topbar-height: 60px;
-  --page-max: 1200px;
+  --page-max: none; /* pages fill the available width */
   --panel-width: 400px;
 
   /* surfaces and text */

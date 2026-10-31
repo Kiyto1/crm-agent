@@ -3,6 +3,18 @@ import { APP_NAME, ROUTES } from '../../routes'
 import Button from '../ui/Button'
 import Icon from '../ui/Icon'
 import AboutDemo from './AboutDemo'
+import WelcomeDialog from './WelcomeDialog'
+
+// Remembers (in this browser) that the welcome was already shown.
+const WELCOME_KEY = 'crm-welcome-seen'
+
+function shouldShowWelcome() {
+  try {
+    return !localStorage.getItem(WELCOME_KEY)
+  } catch {
+    return true // storage blocked: show it, it is only a hint
+  }
+}
 
 const THEME_ICON = { light: 'sun', dark: 'moon', system: 'monitor' }
 
@@ -20,6 +32,7 @@ export default function AppShell({
 }) {
   const [navOpen, setNavOpen] = useState(false) // mobile drawer
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [welcomeOpen, setWelcomeOpen] = useState(shouldShowWelcome)
 
   const mainRef = useRef(null)
   const previousRoute = useRef(route)
@@ -47,6 +60,16 @@ export default function AppShell({
 
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [navOpen])
+
+  function closeWelcome() {
+    setWelcomeOpen(false)
+
+    try {
+      localStorage.setItem(WELCOME_KEY, '1')
+    } catch {
+      // Nothing to do: it will simply show again next time.
+    }
+  }
 
   return (
     <div className={assistantOpen ? 'shell shell--panel-open' : 'shell'}>
@@ -166,6 +189,15 @@ export default function AppShell({
       </div>
 
       {panel}
+
+      <WelcomeDialog
+        open={welcomeOpen}
+        onClose={closeWelcome}
+        onLearnMore={() => {
+          closeWelcome()
+          setAboutOpen(true)
+        }}
+      />
 
       <AboutDemo open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>

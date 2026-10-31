@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../api'
+import { newId } from '../utils/newId'
 import {
   hideSession,
   renameSession,
@@ -62,7 +63,7 @@ export function useChat({ onDataChanged } = {}) {
 
 
   function addMessage(role, content) {
-    const id = crypto.randomUUID()
+    const id = newId()
 
     setMessages(previous => [...previous, { id, role, content }])
 
