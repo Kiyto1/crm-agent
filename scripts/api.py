@@ -207,7 +207,7 @@ def approve(
         # The graph may finish or request another approval.
         return format_result(result, session_id)
 
-
+# for the side bar 
 @app.get("/sessions")
 def list_sessions(
     visitor_id: str = Depends(get_visitor_id),
@@ -345,4 +345,4 @@ def get_session(
                 }
             )
 
-        return result
+        return result

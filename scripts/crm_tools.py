@@ -573,4 +573,4 @@ if __name__ == "__main__":
     for task in tasks:
         print(task)
 
-    print(f"\nTotal tasks: {len(tasks)}")
+    print(f"\nTotal tasks: {len(tasks)}")
