@@ -6,6 +6,13 @@ You can browse customers, deals, and tasks in the dashboard, or ask the assistan
 
 The data is 120 synthetic customer records. This is a prototype, not a production system.
 
+![Overview dashboard](docs/screenshots/overview.png)
+
+| | |
+|---|---|
+| ![Customers](docs/screenshots/customers.png) | ![Deals](docs/screenshots/deals.png) |
+| ![Tasks](docs/screenshots/tasks.png) | |
+
 ## What it does
 
 Assistant:
